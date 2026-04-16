@@ -1,0 +1,28 @@
+managed implementation in class ZBP_I_SALESORDER unique;
+strict ( 2 );
+
+define behavior for ZI_I_SALESORDER alias i_salesorder
+persistent table i_salesorder
+lock master
+authorization master ( global )
+{
+
+  create;
+  update;
+  delete;
+
+  association _i_salesorderitem { create; }
+}
+
+define behavior for ZI_I_SALESORDERITEM alias i_salesorderitem
+persistent table i_salesorderitem
+lock dependent by _i_salesorder
+authorization dependent by _i_salesorder
+{
+
+  create;
+  update;
+  delete;
+
+  action Test_action result [1] $self;
+}

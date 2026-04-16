@@ -1,0 +1,35 @@
+# Compiled class files
+bin/
+*.class
+
+# Eclipse project files
+.project
+.classpath
+.settings/
+.metadata/
+
+# Eclipse plugin build output
+target/
+build/
+*.jar
+!lib/*.jar
+
+# macOS
+.DS_Store
+._*
+
+# Java
+*.log
+hs_err_pid*
+
+# IDE
+*.swp
+*.swo
+*~
+.idea/
+*.iml
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini

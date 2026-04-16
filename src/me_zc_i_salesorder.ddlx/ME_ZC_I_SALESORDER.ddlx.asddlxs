@@ -1,0 +1,24 @@
+@Metadata.layer: #CUSTOMER
+@UI: {
+  headerInfo: {
+    typeName: 'i_salesorder',
+    typeNamePlural: 'i_salesorders'
+  }
+}
+annotate entity ZC_I_SALESORDER with
+{
+  @UI.facet: [
+    { id: 'i_salesorder',
+      purpose: #STANDARD,
+      type: #IDENTIFICATION_REFERENCE,
+      label: 'i_salesorder Details',
+      position: 10 },
+    { id: 'i_salesorderitem',
+      purpose: #STANDARD,
+      type: #LINEITEM_REFERENCE,
+      label: 'i_salesorderitems',
+      position: 20,
+      targetElement: '_i_salesorderitem' }
+  ]
+
+}

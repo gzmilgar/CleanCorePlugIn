@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.eclipse.ui.views">
+      <category
+            id="com.rap.generator.category"
+            name="SAP RAP Generator">
+      </category>
+      <view
+            id="com.rap.generator.view"
+            name="RAP Code Generator"
+            category="com.rap.generator.category"
+            class="com.rap.generator.ui.RapGeneratorView"
+            allowMultiple="false"
+            restorable="true">
+      </view>
+   </extension>
+   <extension
+         point="org.eclipse.ui.perspectiveExtensions">
+      <perspectiveExtension
+            targetID="org.eclipse.ui.resourcePerspective">
+         <view
+               id="com.rap.generator.view"
+               relative="org.eclipse.ui.views.ContentOutline"
+               relationship="stack">
+         </view>
+      </perspectiveExtension>
+   </extension>
+</plugin>

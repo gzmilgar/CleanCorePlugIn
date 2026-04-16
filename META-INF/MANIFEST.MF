@@ -1,0 +1,21 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: SAP RAP Code Generator
+Bundle-SymbolicName: com.rap.generator;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: com.rap.generator.Activator
+Bundle-Vendor: RAP Generator
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.jface,
+ org.eclipse.ui.forms,
+ org.eclipse.core.resources
+Bundle-RequiredExecutionEnvironment: JavaSE-11
+Automatic-Module-Name: com.rap.generator
+Bundle-ActivationPolicy: lazy
+Bundle-ClassPath: .
+Export-Package: com.rap.generator,
+ com.rap.generator.model,
+ com.rap.generator.generators,
+ com.rap.generator.data,
+ com.rap.generator.utils
