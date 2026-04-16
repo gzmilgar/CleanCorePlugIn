@@ -1,6 +1,7 @@
 package com.rap.generator.ui.panels;
 
 import com.rap.generator.generators.GeneratorEngine.GeneratedArtifact;
+import com.rap.generator.ui.dialogs.DeployDialog;
 import com.rap.generator.ui.widgets.AbapSourceViewer;
 
 import org.eclipse.swt.SWT;
@@ -173,58 +174,75 @@ public class CodeOutputPanel {
     private void exportAsAbapGit() {
         if (currentArtifacts == null || currentArtifacts.isEmpty()) return;
 
-        DirectoryDialog dlg = new DirectoryDialog(container.getShell(), SWT.SAVE);
-        dlg.setText("Export as abapGit Structure");
-        dlg.setMessage("Select a root directory for abapGit export:");
-        String dir = dlg.open();
+        DeployDialog dlg = new DeployDialog();
+        if (!dlg.open(container.getShell())) return;
 
-        if (dir != null) {
-            int count = 0;
-            try {
-                // Create abapGit-compatible folder structure
-                // src/<package_name>/
-                File srcDir = new File(dir, "src");
-                srcDir.mkdirs();
+        String packageName = dlg.getPackageName();
+        String transportRequest = dlg.getTransportRequest();
+        String dir = dlg.getExportDirectory();
 
-                for (Map.Entry<String, GeneratedArtifact> entry : currentArtifacts.entrySet()) {
-                    GeneratedArtifact artifact = entry.getValue();
-                    String fileName = artifact.getFileName();
-                    File subDir;
+        int count = 0;
+        try {
+            // Create src/ directory (abapGit flat structure)
+            File srcDir = new File(dir, "src");
+            srcDir.mkdirs();
 
-                    switch (artifact.getObjectType()) {
-                        case "DDLS":
-                            subDir = new File(srcDir, artifact.getObjectName().toLowerCase() + ".ddls");
-                            break;
-                        case "DDLX":
-                            subDir = new File(srcDir, artifact.getObjectName().toLowerCase() + ".ddlx");
-                            break;
-                        case "BDEF":
-                            subDir = new File(srcDir, artifact.getObjectName().toLowerCase() + ".bdef");
-                            break;
-                        case "CLAS":
-                            subDir = new File(srcDir, artifact.getObjectName().toLowerCase() + ".clas");
-                            break;
-                        case "SRVD":
-                            subDir = new File(srcDir, artifact.getObjectName().toLowerCase() + ".srvd");
-                            break;
-                        default:
-                            subDir = srcDir;
-                    }
+            for (Map.Entry<String, GeneratedArtifact> entry : currentArtifacts.entrySet()) {
+                GeneratedArtifact artifact = entry.getValue();
+                String fileName = artifact.getFileName();
 
-                    subDir.mkdirs();
-                    File file = new File(subDir, fileName);
-                    try (FileWriter writer = new FileWriter(file)) {
-                        writer.write(artifact.getSourceCode());
-                        count++;
-                    }
+                // Write the source file directly into src/ (flat structure)
+                File file = new File(srcDir, fileName.toLowerCase());
+                try (FileWriter writer = new FileWriter(file)) {
+                    writer.write(artifact.getSourceCode());
+                    count++;
                 }
-
-                showInfoMessage("Exported " + count + " files in abapGit structure to:\n" + dir
-                    + "\n\nYou can import this via abapGit in your SAP system.");
-            } catch (IOException ex) {
-                showErrorMessage("Export failed: " + ex.getMessage());
             }
+
+            // Generate .abapgit.xml at the repository root
+            File abapgitXml = new File(dir, ".abapgit.xml");
+            try (FileWriter writer = new FileWriter(abapgitXml)) {
+                writer.write(buildAbapGitXml(packageName, transportRequest));
+            }
+
+            showInfoMessage("Exported " + count + " files in abapGit structure to:\n" + dir
+                + "\n\nPackage: " + packageName
+                + (transportRequest != null ? "\nTransport: " + transportRequest : "")
+                + "\n\nTo import into SAP:\n"
+                + "1. Open abapGit in your SAP system\n"
+                + "2. Create a new offline repository pointing to this directory\n"
+                + "3. Pull the repository to import all objects");
+        } catch (IOException ex) {
+            showErrorMessage("Export failed: " + ex.getMessage());
         }
+    }
+
+    /**
+     * Builds the .abapgit.xml content that configures the abapGit repository.
+     * This file tells abapGit which package to place objects into and
+     * optionally which transport request to use.
+     */
+    private String buildAbapGitXml(String packageName, String transportRequest) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+        sb.append("<asx:abap xmlns:asx=\"http://www.sap.com/abapxml\" version=\"1.0\">\n");
+        sb.append(" <asx:values>\n");
+        sb.append("  <DATA>\n");
+        sb.append("   <MASTER_LANGUAGE>E</MASTER_LANGUAGE>\n");
+        sb.append("   <STARTING_FOLDER>/src/</STARTING_FOLDER>\n");
+        sb.append("   <FOLDER_LOGIC>FLAT</FOLDER_LOGIC>\n");
+        sb.append("   <IGNORE>\n");
+        sb.append("    <item>/.gitignore</item>\n");
+        sb.append("    <item>/LICENSE</item>\n");
+        sb.append("    <item>/README.md</item>\n");
+        sb.append("    <item>/package.json</item>\n");
+        sb.append("    <item>/.travis.yml</item>\n");
+        sb.append("   </IGNORE>\n");
+        sb.append("   <REQUIREMENTS/>\n");
+        sb.append("  </DATA>\n");
+        sb.append(" </asx:values>\n");
+        sb.append("</asx:abap>\n");
+        return sb.toString();
     }
 
     private void copyToClipboard(String text) {
