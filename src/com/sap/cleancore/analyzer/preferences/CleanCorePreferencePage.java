@@ -23,6 +23,7 @@ public class CleanCorePreferencePage extends PreferencePage implements IWorkbenc
     private Text atcVariantText;
     private Text apiHubUrlText;
     private Text locSText, locMText, locLText;
+    private org.eclipse.swt.widgets.Button allowSelfSignedBtn;
 
     private final EnumMap<ZObjectType, Text[]> coeffFields = new EnumMap<>(ZObjectType.class);
 
@@ -50,6 +51,15 @@ public class CleanCorePreferencePage extends PreferencePage implements IWorkbenc
         apiHubUrlText = new Text(root, SWT.BORDER);
         apiHubUrlText.setText(CleanCorePreferences.getApiHubUrl());
         apiHubUrlText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        // Self-signed certificate toggle
+        new Label(root, SWT.NONE).setText("");
+        allowSelfSignedBtn = new org.eclipse.swt.widgets.Button(root, SWT.CHECK);
+        allowSelfSignedBtn.setText("Accept self-signed / internal SAP certificates (recommended for customer systems)");
+        allowSelfSignedBtn.setSelection(CleanCorePreferences.isAllowSelfSignedCerts());
+        GridData ssgd = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        ssgd.horizontalSpan = 1;
+        allowSelfSignedBtn.setLayoutData(ssgd);
 
         Group thresh = new Group(root, SWT.NONE);
         thresh.setText("Size thresholds (LOC)");
@@ -111,6 +121,7 @@ public class CleanCorePreferencePage extends PreferencePage implements IWorkbenc
         locSText.setText(String.valueOf(th.locS));
         locMText.setText(String.valueOf(th.locM));
         locLText.setText(String.valueOf(th.locL));
+        allowSelfSignedBtn.setSelection(true);
         for (Map.Entry<ZObjectType, Text[]> e : coeffFields.entrySet()) {
             EffortRules.Coefficients c = EffortRules.getInstance().coefficientsFor(e.getKey());
             e.getValue()[0].setText(String.valueOf(c.s));
@@ -126,6 +137,7 @@ public class CleanCorePreferencePage extends PreferencePage implements IWorkbenc
         try {
             CleanCorePreferences.setAtcVariant(atcVariantText.getText().trim());
             CleanCorePreferences.setApiHubUrl(apiHubUrlText.getText().trim());
+            CleanCorePreferences.setAllowSelfSignedCerts(allowSelfSignedBtn.getSelection());
 
             EffortRules.Thresholds th = new EffortRules.Thresholds();
             th.locS = Integer.parseInt(locSText.getText().trim());

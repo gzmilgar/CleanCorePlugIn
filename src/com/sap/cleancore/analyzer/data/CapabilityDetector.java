@@ -55,8 +55,41 @@ public class CapabilityDetector {
             String msg = e.getMessage() != null ? e.getMessage() : e.toString();
             // 401/403 still means the endpoint exists; capability is technically there.
             if (msg.contains("401") || msg.contains("403")) return ProbeResult.success();
-            return ProbeResult.failure(msg);
+            return ProbeResult.failure(categorise(msg));
         }
+    }
+
+    /**
+     * Translate raw stack-trace-y exception text into one short, actionable
+     * line that the UI dialog shows to the analyst.
+     */
+    private String categorise(String msg) {
+        if (msg == null) return "Unknown HTTP error.";
+        String low = msg.toLowerCase();
+        if (low.contains("pkix") || low.contains("sslhandshake")
+                || low.contains("certificate") || low.contains("trustanchor")) {
+            return "SSL trust failure — enable 'Accept self-signed certificates' in "
+                 + "Preferences → Clean Core Analyzer. (" + msg + ")";
+        }
+        if (low.contains("timeout") || low.contains("timed out")) {
+            return "Connection timeout — VPN may be off, the host may be unreachable, "
+                 + "or a corporate proxy is needed (check Eclipse Network Connections). "
+                 + "(" + msg + ")";
+        }
+        if (low.contains("unknownhost") || low.contains("name or service not known")) {
+            return "Hostname not resolved — check the ADT destination configuration. "
+                 + "(" + msg + ")";
+        }
+        if (low.contains("401") || low.contains("403")) {
+            return "Authentication failed — ADT session cookie may be stale. "
+                 + "Open the ABAP project in Project Explorer to refresh it, "
+                 + "then retry. (" + msg + ")";
+        }
+        if (low.contains("connect") && low.contains("refused")) {
+            return "Connection refused — port may be closed or the system is offline. "
+                 + "(" + msg + ")";
+        }
+        return msg;
     }
 
     private String probeVersion(AdtConnectionService adt) {

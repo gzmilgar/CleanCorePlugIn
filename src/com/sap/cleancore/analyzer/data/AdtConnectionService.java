@@ -196,10 +196,24 @@ public class AdtConnectionService {
         if (client != null && !client.isEmpty()) {
             full += (full.contains("?") ? "&" : "?") + "sap-client=" + client;
         }
-        HttpURLConnection conn = (HttpURLConnection) new URL(full).openConnection();
+
+        java.net.URL targetUrl = new URL(full);
+
+        // 1) Eclipse Network Connections proxy — read what ADT already uses.
+        java.net.Proxy proxy = resolveEclipseProxy(targetUrl);
+
+        HttpURLConnection conn = (HttpURLConnection)
+                (proxy != null ? targetUrl.openConnection(proxy) : targetUrl.openConnection());
         conn.setRequestMethod(method);
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(60000);
+
+        // 2) SSL trust — accept self-signed / internal CAs that ADT trusts but
+        //    that aren't in the JVM default truststore. Toggleable via prefs.
+        if (conn instanceof javax.net.ssl.HttpsURLConnection) {
+            applySslTrust((javax.net.ssl.HttpsURLConnection) conn);
+        }
+
         if (password != null && username != null) {
             String auth = username + ":" + password;
             conn.setRequestProperty("Authorization", "Basic "
@@ -207,6 +221,75 @@ public class AdtConnectionService {
         }
         if (sessionCookie != null) conn.setRequestProperty("Cookie", sessionCookie);
         return conn;
+    }
+
+    /**
+     * Asks Eclipse's IProxyService (org.eclipse.core.net) for a proxy that
+     * applies to the given URL. Returns null when no proxy is configured or
+     * when the proxy bundle is not available at runtime.
+     *
+     * Uses pure reflection so we don't require org.eclipse.core.net as a
+     * Require-Bundle dependency — it's part of Eclipse base, present in
+     * practice, but this stays defensive.
+     */
+    private java.net.Proxy resolveEclipseProxy(java.net.URL url) {
+        try {
+            org.osgi.framework.Bundle bundle = org.osgi.framework.FrameworkUtil
+                    .getBundle(AdtConnectionService.class);
+            if (bundle == null) return null;
+            org.osgi.framework.BundleContext ctx = bundle.getBundleContext();
+            if (ctx == null) return null;
+
+            org.osgi.framework.ServiceReference<?> ref = ctx
+                    .getServiceReference("org.eclipse.core.net.proxy.IProxyService");
+            if (ref == null) return null;
+            Object svc = ctx.getService(ref);
+            if (svc == null) return null;
+
+            Object[] entries = (Object[]) svc.getClass()
+                    .getMethod("select", java.net.URI.class).invoke(svc, url.toURI());
+            ctx.ungetService(ref);
+            if (entries == null || entries.length == 0) return null;
+
+            Object entry = entries[0];
+            String host = (String) entry.getClass().getMethod("getHost").invoke(entry);
+            Integer port = (Integer) entry.getClass().getMethod("getPort").invoke(entry);
+            if (host == null) return null;
+            return new java.net.Proxy(java.net.Proxy.Type.HTTP,
+                    new java.net.InetSocketAddress(host, port != null ? port : 8080));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * Configures the HTTPS connection to accept self-signed certificates when
+     * the preference is enabled. Most customer dev/test ABAP systems use
+     * non-public CAs that ADT already trusts via Eclipse's truststore — the
+     * plug-in's plain HttpsURLConnection does not see that chain, so without
+     * this we fail with PKIX handshake errors.
+     */
+    private void applySslTrust(javax.net.ssl.HttpsURLConnection https) {
+        if (!com.sap.cleancore.analyzer.preferences.CleanCorePreferences.isAllowSelfSignedCerts()) {
+            return; // user opted out — keep strict JVM defaults
+        }
+        try {
+            javax.net.ssl.SSLContext ctx = javax.net.ssl.SSLContext.getInstance("TLS");
+            ctx.init(null, new javax.net.ssl.TrustManager[] {
+                new javax.net.ssl.X509TrustManager() {
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return new java.security.cert.X509Certificate[0];
+                    }
+                    public void checkClientTrusted(java.security.cert.X509Certificate[] c, String t) {}
+                    public void checkServerTrusted(java.security.cert.X509Certificate[] c, String t) {}
+                }
+            }, new java.security.SecureRandom());
+            https.setSSLSocketFactory(ctx.getSocketFactory());
+            https.setHostnameVerifier((host, session) -> true);
+        } catch (Exception ignored) {
+            // fall back to JVM default trust — handshake may still fail with PKIX,
+            // but CapabilityDetector now categorises that into a clear message.
+        }
     }
 
     private void tryDeriveUrlFromProject() {
@@ -229,8 +312,24 @@ public class AdtConnectionService {
             }
             String cli = (String) invoke(destData, "getClient");
             if (cli != null) this.client = cli;
-            String cookie = (String) invoke(destData, "getSessionCookie");
-            if (cookie != null) this.sessionCookie = cookie;
+
+            // Cookie extraction — ADT versions name this method inconsistently.
+            // Probe a known set of candidates on both the destination and the
+            // project, take the first non-null result.
+            String[] cookieMethods = {
+                    "getSessionCookie", "getCookie", "getSession",
+                    "getAuthenticationCookie", "getAuthCookie"
+            };
+            for (String mname : cookieMethods) {
+                Object c = invoke(destData, mname);
+                if (c != null) { this.sessionCookie = c.toString(); break; }
+            }
+            if (this.sessionCookie == null) {
+                for (String mname : cookieMethods) {
+                    Object c = invoke(abapProject, mname);
+                    if (c != null) { this.sessionCookie = c.toString(); break; }
+                }
+            }
         } catch (Throwable ignore) {
             // ADT classes not present (non-ADT Eclipse) — fall back to manual mode
         }
