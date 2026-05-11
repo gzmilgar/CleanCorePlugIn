@@ -58,6 +58,7 @@ public class AdtConnectionService {
         return "Not connected";
     }
     public String getSystemUrl() { return systemUrl; }
+    public IProject getAdtProject() { return adtProject; }
 
     public void connectViaProject(IProject project, String systemId, String client, String user) {
         this.adtProject = project;

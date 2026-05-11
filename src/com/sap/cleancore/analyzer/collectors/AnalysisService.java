@@ -41,7 +41,9 @@ public class AnalysisService {
     }
 
     private final ZObjectCollector zCollector = new ZObjectCollector();
+    private final WorkspaceAdtCollector workspaceCollector = new WorkspaceAdtCollector();
     private final SourceFetcher sourceFetcher = new SourceFetcher();
+    private final AdtResourceSourceFetcher workspaceSource = new AdtResourceSourceFetcher();
     private final AtcCollector atcCollector = new AtcCollector();
     private final StaticAbapAnalyzer staticAnalyzer = new StaticAbapAnalyzer();
     private final ObsoleteApiDetector apiDetector = new ObsoleteApiDetector();
@@ -60,36 +62,43 @@ public class AnalysisService {
         run.setSystemDisplay(AdtConnectionService.getInstance().getDisplayName());
         run.setPackageFilter(filter.getPackagePrefixes());
 
-        // 1) Capabilities
+        // 1) Capabilities (best-effort — used only to decide ATC + display.
+        //    Failure no longer aborts: the workspace-based collector below
+        //    works without HTTP for systems already opened in ADT.)
         monitor.subTask("Detecting system capabilities...");
         SystemCapabilities caps = new CapabilityDetector().detect();
         run.setCapabilities(caps);
         progress(listener, 0, 1, "Detected capabilities: " + caps.summary());
         checkCancel(monitor);
+        boolean httpReachable = !caps.isAllUnavailable();
 
-        // Bail out early if NO HTTP endpoint responded — analysis has no chance.
-        // The diagnostic message tells the user WHY (timeout, refused, SAProuter, etc.).
-        if (caps.isAllUnavailable()) {
-            String diag = caps.getDiagnosticMessage() != null
-                    ? caps.getDiagnosticMessage()
-                    : "All ADT probes failed.";
-            throw new Exception(
-                    "Cannot reach the SAP system over HTTP from this plug-in.\n\n"
-                  + "Detail: " + diag + "\n\n"
-                  + "Likely causes:\n"
-                  + "  - The system is behind SAProuter and the plug-in's plain-HTTP\n"
-                  + "    client cannot tunnel through it. Try connecting via VPN or use\n"
-                  + "    a directly-accessible system (BTP ABAP trial, S/4HANA Cloud).\n"
-                  + "  - Network firewall blocks the system's HTTPS port.\n"
-                  + "  - Wrong host or port in the ADT destination.\n\n"
-                  + "Mapping Maintenance still works offline and is preloaded with\n"
-                  + "thousands of SAP Cloudification Repository entries.");
+        // 2) Inventory — try the workspace ADT path first (no HTTP). If it
+        //    comes up empty AND HTTP is reachable, fall back to the
+        //    repository search.
+        monitor.subTask("Collecting Z* inventory from ADT workspace...");
+        progress(listener, 0, 1, "Collecting Z* inventory from ADT workspace...");
+        List<ZObject> objects = workspaceCollector.collect(filter);
+        boolean usedWorkspace = !objects.isEmpty();
+        if (objects.isEmpty()) {
+            if (httpReachable) {
+                monitor.subTask("Workspace empty — falling back to HTTP TADIR search...");
+                progress(listener, 0, 1, "Falling back to HTTP TADIR search...");
+                objects = zCollector.collect(filter);
+            } else {
+                throw new Exception(
+                        "No Z*/Y* objects found.\n\n"
+                      + "Likely causes:\n"
+                      + "  - You haven't opened the target package(s) in Project Explorer yet,\n"
+                      + "    so ADT hasn't cached them. Expand the package node first, then re-run.\n"
+                      + "  - The package prefix filter in the wizard didn't match any package\n"
+                      + "    that is currently visible in this ABAP project's tree.\n"
+                      + "  - The system is behind SAProuter and the plug-in's HTTP client\n"
+                      + "    cannot reach it; the ADT workspace cache was empty too.\n\n"
+                      + "Tip: open the package(s) you want to analyse in Project Explorer\n"
+                      + "(double-click a Z program to confirm ADT can resolve them), then\n"
+                      + "re-run with the package prefix.");
+            }
         }
-
-        // 2) Inventory
-        monitor.subTask("Collecting Z* inventory...");
-        progress(listener, 0, 1, "Collecting Z* inventory...");
-        List<ZObject> objects = zCollector.collect(filter);
         checkCancel(monitor);
 
         // 3) ATC (optional)
@@ -117,8 +126,15 @@ public class AnalysisService {
 
             MigrationItem item = new MigrationItem(z);
 
-            // 4a) Source
-            String src = sourceFetcher.fetch(z);
+            // 4a) Source — prefer workspace cache (no HTTP), fall back to HTTP
+            //      fetcher when the workspace path can't resolve it.
+            String src = null;
+            if (usedWorkspace) {
+                src = workspaceSource.fetch(z);
+            }
+            if (src == null && httpReachable) {
+                src = sourceFetcher.fetch(z);
+            }
             if (src != null) {
                 z.setSource(src);
                 z.setComplexity(complexityCalc.compute(src));
