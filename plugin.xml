@@ -59,4 +59,43 @@
             class="com.sap.cleancore.analyzer.preferences.CleanCorePreferencePage">
       </page>
    </extension>
+   <extension point="org.eclipse.ui.commands">
+      <category
+            id="com.sap.cleancore.analyzer.commands"
+            name="Clean Core">
+      </category>
+      <command
+            id="com.sap.cleancore.analyzer.analyzeCurrentFile"
+            name="Analyze Current File"
+            description="Analyse the currently open ABAP source file for clean-core findings."
+            categoryId="com.sap.cleancore.analyzer.commands">
+      </command>
+   </extension>
+   <extension point="org.eclipse.ui.handlers">
+      <handler
+            commandId="com.sap.cleancore.analyzer.analyzeCurrentFile"
+            class="com.sap.cleancore.analyzer.handlers.AnalyzeCurrentFileHandler">
+      </handler>
+   </extension>
+   <extension point="org.eclipse.ui.bindings">
+      <key
+            sequence="M1+M2+K"
+            commandId="com.sap.cleancore.analyzer.analyzeCurrentFile"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration">
+      </key>
+   </extension>
+   <extension point="org.eclipse.ui.menus">
+      <menuContribution
+            locationURI="menu:org.eclipse.ui.main.menu?after=window">
+         <menu
+               id="com.sap.cleancore.analyzer.menu"
+               label="Clean Core">
+            <command
+                  commandId="com.sap.cleancore.analyzer.analyzeCurrentFile"
+                  label="Analyze Current File"
+                  style="push">
+            </command>
+         </menu>
+      </menuContribution>
+   </extension>
 </plugin>

@@ -57,6 +57,12 @@ public class CleanCoreAnalyzerView extends ViewPart {
     private Label statusLabel;
     private ProgressBar progressBar;
 
+    // "Current File" tab — single-file analysis results
+    private TabItem currentFileTab;
+    private TableViewer currentFileTable;
+    private Label currentFileSummaryLabel;
+    private TabFolder tabFolder;
+
     private AnalysisRun currentRun;
 
     @Override
@@ -128,6 +134,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
 
         // Detail tabs
         TabFolder tabs = new TabFolder(parent, SWT.NONE);
+        this.tabFolder = tabs;
         GridData tgd = new GridData(SWT.FILL, SWT.FILL, true, true);
         tgd.heightHint = 200;
         tabs.setLayoutData(tgd);
@@ -176,6 +183,36 @@ public class CleanCoreAnalyzerView extends ViewPart {
         reasoningText = new Text(tabs, SWT.MULTI | SWT.WRAP | SWT.V_SCROLL | SWT.BORDER | SWT.READ_ONLY);
         reasoningTab.setControl(reasoningText);
 
+        // Current File analysis tab (Clean Core → Analyze Current File output)
+        currentFileTab = new TabItem(tabs, SWT.NONE);
+        currentFileTab.setText("Current File");
+        Composite cfContainer = new Composite(tabs, SWT.NONE);
+        cfContainer.setLayout(new GridLayout(1, false));
+        currentFileSummaryLabel = new Label(cfContainer, SWT.NONE);
+        currentFileSummaryLabel.setText("Use 'Clean Core → Analyze Current File' menu (Ctrl+Shift+K).");
+        currentFileSummaryLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        currentFileTable = new TableViewer(cfContainer, SWT.FULL_SELECTION | SWT.BORDER | SWT.V_SCROLL);
+        currentFileTable.getTable().setHeaderVisible(true);
+        currentFileTable.getTable().setLinesVisible(true);
+        currentFileTable.getTable().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        addCol(currentFileTable, "Severity", 80,  f -> ((Finding) f).getSeverity().name());
+        addCol(currentFileTable, "Rule",     70,  f -> safe(((Finding) f).getCheckId()));
+        addCol(currentFileTable, "Name",     220, f -> safe(((Finding) f).getRuleName()));
+        addCol(currentFileTable, "Line",     50,  f -> String.valueOf(((Finding) f).getLine()));
+        addCol(currentFileTable, "Category", 140, f -> safe(((Finding) f).getCategory()));
+        addCol(currentFileTable, "Matched Code", 320, f -> safe(((Finding) f).getMatchedCode()));
+        addCol(currentFileTable, "Suggestion",   320, f -> safe(((Finding) f).getSuggestion()));
+        currentFileTable.setContentProvider(new IStructuredContentProvider() {
+            @Override public Object[] getElements(Object input) {
+                if (input instanceof java.util.List) return ((java.util.List<?>) input).toArray();
+                return new Object[0];
+            }
+            @Override public void dispose() {}
+            @Override public void inputChanged(Viewer v, Object o, Object n) {}
+        });
+        currentFileTab.setControl(cfContainer);
+
         // Status bar
         statusLabel = new Label(parent, SWT.NONE);
         statusLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
@@ -221,6 +258,23 @@ public class CleanCoreAnalyzerView extends ViewPart {
     }
 
     private void onRun() {
+        try {
+            doRun();
+        } catch (Throwable t) {
+            // Surface any silent failure so the user (and Error Log) sees it.
+            try {
+                com.rap.generator.Activator.getDefault().getLog().log(
+                        new org.eclipse.core.runtime.Status(
+                                org.eclipse.core.runtime.IStatus.ERROR,
+                                "com.rap.generator",
+                                "Run Analysis failed: " + t.getMessage(), t));
+            } catch (Throwable ignored) {}
+            MessageDialog.openError(getSite().getShell(), "Run Analysis failed",
+                    "Could not start analysis:\n\n" + (t.getMessage() != null ? t.getMessage() : t.toString()));
+        }
+    }
+
+    private void doRun() {
         if (!AdtConnectionService.getInstance().isConnected()) {
             MessageDialog.openWarning(getSite().getShell(), "Clean Core",
                     "Please connect to an SAP system first.");
@@ -338,6 +392,33 @@ public class CleanCoreAnalyzerView extends ViewPart {
             }
         }
         statusLabel.setText(sb.toString());
+    }
+
+    /**
+     * Populate the "Current File" tab with findings from a single-file
+     * analysis (Clean Core → Analyze Current File). Switches focus to that
+     * tab and updates the summary label.
+     */
+    public void showCurrentFileFindings(String fileName, java.util.List<Finding> findings) {
+        if (currentFileTable == null || currentFileSummaryLabel == null) return;
+        int critical = 0, warning = 0, info = 0;
+        for (Finding f : findings) {
+            if (f.getSeverity() == Finding.Severity.ERROR) critical++;
+            else if (f.getSeverity() == Finding.Severity.WARNING) warning++;
+            else info++;
+        }
+        currentFileSummaryLabel.setText(
+                (fileName != null ? fileName : "(unknown)")
+                + "    |    Critical: " + critical
+                + "    Warning: " + warning
+                + "    Info: " + info
+                + "    Total: " + findings.size());
+        currentFileSummaryLabel.getParent().layout();
+
+        currentFileTable.setInput(findings);
+        if (tabFolder != null && currentFileTab != null) {
+            tabFolder.setSelection(currentFileTab);
+        }
     }
 
     @Override public void setFocus() {

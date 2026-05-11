@@ -16,6 +16,13 @@ public class Finding {
     private int line;
     private String category;        // e.g. "SQL", "Released API", "Modification"
 
+    // Single-file analysis (Analyze Current File) extras — populated by
+    // StaticAbapAnalyzer/ObsoleteApiDetector for the new editor-based workflow.
+    private String ruleName;        // human-readable rule name shown in Results table
+    private String suggestion;      // recommendation text (e.g. "MARA -> I_Product")
+    private String matchedCode;     // the literal code fragment the rule matched
+    private String cleanCoreApi;    // optional modern API hint (e.g. CDS view name)
+
     public Finding() {}
 
     public Finding(String checkId, String message, Severity severity, Source source) {
@@ -42,6 +49,18 @@ public class Finding {
 
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
+
+    public String getRuleName() { return ruleName; }
+    public void setRuleName(String ruleName) { this.ruleName = ruleName; }
+
+    public String getSuggestion() { return suggestion; }
+    public void setSuggestion(String suggestion) { this.suggestion = suggestion; }
+
+    public String getMatchedCode() { return matchedCode; }
+    public void setMatchedCode(String matchedCode) { this.matchedCode = matchedCode; }
+
+    public String getCleanCoreApi() { return cleanCoreApi; }
+    public void setCleanCoreApi(String cleanCoreApi) { this.cleanCoreApi = cleanCoreApi; }
 
     @Override
     public String toString() {
