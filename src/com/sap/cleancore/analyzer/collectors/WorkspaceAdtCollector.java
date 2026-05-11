@@ -7,6 +7,10 @@ import com.sap.cleancore.analyzer.model.ZObjectType;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
+import org.eclipse.ui.IEditorReference;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.IWorkbenchWindow;
+import org.eclipse.ui.PlatformUI;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -16,36 +20,126 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Walks the Eclipse ABAP project tree (already populated by ADT in the
- * Project Explorer) and harvests Z-star and Y-star objects without making a
- * single HTTP call to the SAP system. This is the path that works behind
- * SAProuter / VPN-less networks where ADT itself can manually fetch nodes but
- * our plain HttpURLConnection cannot.
+ * Harvests Z-star and Y-star objects from sources already cached in this
+ * Eclipse session, with NO HTTP traffic to the SAP system.
  *
- * Strategy: project.members(DEPTH_INFINITE) returns IResources that ADT
- * advertises. Each ABAP object is exposed with an IAdtObjectReference
- * adapter; we reach the name/type/package via reflection so we don't depend
- * on com.sap.adt.* classes being on our compile classpath.
+ * The ADT Project Explorer tree is NOT exposed through the standard Eclipse
+ * IResource API — it is rendered by ADT's own content provider, so
+ * IProject.members() returns nothing useful. We therefore use a two-tier
+ * harvest strategy:
  *
- * Returns an empty list — with a clear log line — when ADT API isn't
- * reachable; AnalysisService falls back to the HTTP-based ZObjectCollector
- * automatically in that case.
+ *   Tier 1 — Open editors:  every Z file the user has opened (Analyze Current
+ *            File workflow extended). Reliable and HTTP-free.
+ *   Tier 2 — IProject.members():  works only on plain (non-ADT) Eclipse
+ *            installations. Kept as a defensive fallback; usually empty for
+ *            ADT projects.
+ *
+ * AnalysisFilter is applied after collection (mode + Y opt-in + package
+ * prefix), so the wizard's filter contract stays the same.
  */
 public class WorkspaceAdtCollector {
 
     public List<ZObject> collect(AnalysisFilter filter) {
         List<ZObject> out = new ArrayList<>();
-        IProject project = AdtConnectionService.getInstance().getAdtProject();
-        if (project == null || !project.isOpen()) return out;
+        Set<String> seen = new HashSet<>();
 
-        try {
-            IResource[] members = project.members();
-            walk(members, filter, out, new HashSet<>());
-        } catch (Throwable t) {
-            // best-effort; AnalysisService catches an empty list and falls back
+        // ---- Tier 1: open editors (the path that actually works for ADT) ----
+        collectFromOpenEditors(filter, out, seen);
+
+        // ---- Tier 2: standard IResource fallback ----
+        IProject project = AdtConnectionService.getInstance().getAdtProject();
+        if (project != null && project.isOpen()) {
+            try {
+                walk(project.members(), filter, out, seen);
+            } catch (Throwable ignored) {}
         }
         return out;
     }
+
+    /**
+     * Walks every open editor in every Workbench window/page and turns each
+     * editor's file name into a candidate ZObject. ADT names files like
+     * "ZNT_000_CL_001.aclass" / "ZBP_REPORT.prog" — we use the suffix to map
+     * the object type.
+     */
+    private void collectFromOpenEditors(AnalysisFilter filter,
+                                         List<ZObject> out, Set<String> seen) {
+        try {
+            IWorkbenchWindow[] windows = PlatformUI.getWorkbench().getWorkbenchWindows();
+            for (IWorkbenchWindow win : windows) {
+                if (win == null) continue;
+                for (IWorkbenchPage page : win.getPages()) {
+                    if (page == null) continue;
+                    for (IEditorReference ref : page.getEditorReferences()) {
+                        if (ref == null) continue;
+                        String editorName = ref.getName();
+                        if (editorName == null || editorName.isEmpty()) continue;
+                        ZObject z = fromEditorName(editorName);
+                        if (z == null) continue;
+                        if (!matchesFilter(z, filter)) continue;
+                        if (seen.add(z.getName().toUpperCase(Locale.ROOT))) out.add(z);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    /**
+     * Translates an ADT-style editor name (NAME.ext) into a ZObject.
+     * Returns null when the file is not a recognised ABAP source artefact.
+     */
+    private ZObject fromEditorName(String editorName) {
+        // Strip directory part if any
+        int slash = Math.max(editorName.lastIndexOf('/'), editorName.lastIndexOf('\\'));
+        String base = slash >= 0 ? editorName.substring(slash + 1) : editorName;
+
+        int dot = base.lastIndexOf('.');
+        String stem = dot > 0 ? base.substring(0, dot) : base;
+        String ext  = dot > 0 ? base.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
+
+        ZObjectType type = mapExtensionType(ext);
+        if (type == ZObjectType.UNKNOWN) return null;
+
+        ZObject z = new ZObject();
+        z.setName(stem.toUpperCase(Locale.ROOT));
+        z.setType(type);
+        // package is unknown from filename alone — left null so PACKAGE_PREFIX
+        // filter only matches when user provides "*"
+        return z;
+    }
+
+    private ZObjectType mapExtensionType(String ext) {
+        if (ext == null || ext.isEmpty()) return ZObjectType.UNKNOWN;
+        switch (ext) {
+            case "aclass":  // class source
+            case "clas":
+                return ZObjectType.Z_CLASS;
+            case "asinc":   // includes
+            case "reps":
+                return ZObjectType.Z_INCLUDE;
+            case "prog":    // reports
+            case "asprog":
+                return ZObjectType.Z_REPORT;
+            case "fugr":
+            case "asfunc":
+                return ZObjectType.Z_FUNCTION_MODULE;
+            case "intf":
+            case "asintf":
+                return ZObjectType.Z_INTERFACE;
+            case "tabl":
+            case "asddic":
+                return ZObjectType.Z_DDIC_TABLE;
+            case "ddls":
+            case "asddls":
+                return ZObjectType.Z_CDS_VIEW;
+            case "enho":
+                return ZObjectType.Z_ENHANCEMENT;
+            default:
+                return ZObjectType.UNKNOWN;
+        }
+    }
+
+    // ---- Tier 2 helpers (IResource walk, kept for non-ADT Eclipses) ----
 
     private void walk(IResource[] members, AnalysisFilter filter,
                       List<ZObject> out, Set<String> seen) {
@@ -53,10 +147,10 @@ public class WorkspaceAdtCollector {
         for (IResource res : members) {
             if (res == null) continue;
             ZObject z = tryAsAdtObject(res);
-            if (z != null && matchesFilter(z, filter) && seen.add(z.getName().toUpperCase(Locale.ROOT))) {
+            if (z != null && matchesFilter(z, filter)
+                    && seen.add(z.getName().toUpperCase(Locale.ROOT))) {
                 out.add(z);
             }
-            // Recurse into containers
             try {
                 Method m = res.getClass().getMethod("members");
                 Object child = m.invoke(res);
@@ -65,11 +159,6 @@ public class WorkspaceAdtCollector {
         }
     }
 
-    /**
-     * Try to read an IAdtObjectReference adapter off the resource. Falls back
-     * to the resource name if the adapter isn't found — useful for non-ADT
-     * Eclipse installations during development.
-     */
     private ZObject tryAsAdtObject(IResource res) {
         try {
             Class<?> refClass = Class.forName("com.sap.adt.tools.core.model.IAdtObjectReference");
@@ -93,28 +182,26 @@ public class WorkspaceAdtCollector {
         if (filter == null) return true;
         String name = z.getName() != null ? z.getName().toUpperCase(Locale.ROOT) : "";
 
-        // Only Z*/Y* names (and respect includeY)
         boolean isZ = name.startsWith("Z");
         boolean isY = name.startsWith("Y");
         if (!isZ && !isY) return false;
         if (isY && !filter.isIncludeY()) return false;
 
-        // Mode handling
         switch (filter.getMode()) {
             case SINGLE_OBJECT:
                 return filter.getSingleObjectName() != null
                         && name.equalsIgnoreCase(filter.getSingleObjectName().trim());
             case PACKAGE_PREFIX:
-                if (z.getDevClass() == null) return false;
-                String pkg = z.getDevClass().toUpperCase(Locale.ROOT);
+                // Open-editor harvest has no package metadata; fall through to
+                // name-based prefix matching so the wizard still gives useful
+                // filtering (e.g. ZNT_000 matches ZNT_000_*).
                 for (String prefix : filter.getPackagePrefixes()) {
                     if (prefix == null || prefix.isEmpty()) continue;
                     String p = prefix.toUpperCase(Locale.ROOT);
-                    if (p.endsWith("*")) {
-                        if (pkg.startsWith(p.substring(0, p.length() - 1))) return true;
-                    } else if (pkg.equalsIgnoreCase(prefix)) {
-                        return true;
-                    }
+                    if (p.endsWith("*")) p = p.substring(0, p.length() - 1);
+                    if (z.getDevClass() != null
+                            && z.getDevClass().toUpperCase(Locale.ROOT).startsWith(p)) return true;
+                    if (name.startsWith(p)) return true;
                 }
                 return false;
             case FULL:
