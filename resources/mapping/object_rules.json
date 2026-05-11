@@ -1,0 +1,24 @@
+{
+  "_comment": "Effort coefficients in man-days for each Z object type per S/M/L/XL category. Used by EffortEstimator. Edit in Preferences > Clean Core Analyzer.",
+  "rules": {
+    "Z_FUNCTION_MODULE": { "S": 0.5, "M": 1.5, "L": 3,  "XL": 5  },
+    "Z_REPORT":          { "S": 1,   "M": 2,   "L": 4,  "XL": 8  },
+    "Z_CLASS":           { "S": 1,   "M": 2,   "L": 5,  "XL": 10 },
+    "Z_INTERFACE":       { "S": 0.5, "M": 1,   "L": 2,  "XL": 4  },
+    "Z_DDIC_TABLE":      { "S": 0.5, "M": 1,   "L": 2,  "XL": 4  },
+    "Z_DDIC_STRUCTURE":  { "S": 0.25,"M": 0.5, "L": 1,  "XL": 2  },
+    "Z_DOMAIN":          { "S": 0.25,"M": 0.5, "L": 1,  "XL": 2  },
+    "Z_DATA_ELEMENT":    { "S": 0.25,"M": 0.5, "L": 1,  "XL": 2  },
+    "Z_CDS_VIEW":        { "S": 0.5, "M": 1,   "L": 2,  "XL": 4  },
+    "Z_BADI_IMPL":       { "S": 1,   "M": 2,   "L": 4,  "XL": 8  },
+    "Z_ENHANCEMENT":     { "S": 1,   "M": 2,   "L": 5,  "XL": 10 },
+    "Z_INCLUDE":         { "S": 0.5, "M": 1,   "L": 2,  "XL": 4  },
+    "MODIFICATION":      { "S": 2,   "M": 4,   "L": 8,  "XL": 16 },
+    "UNKNOWN":           { "S": 0.5, "M": 1,   "L": 2,  "XL": 4  }
+  },
+  "categoryThresholds": {
+    "_comment": "Used by EffortEstimator to pick S/M/L/XL for a given Z object.",
+    "loc": { "S": 100, "M": 500, "L": 2000 },
+    "errorFindings": { "S": 0, "M": 2, "L": 5 }
+  }
+}

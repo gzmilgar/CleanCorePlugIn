@@ -15,6 +15,26 @@
             allowMultiple="false"
             restorable="true">
       </view>
+      <category
+            id="com.sap.cleancore.analyzer.category"
+            name="SAP Clean Core">
+      </category>
+      <view
+            id="com.sap.cleancore.analyzer.analyzerView"
+            name="Clean Core Analyzer"
+            category="com.sap.cleancore.analyzer.category"
+            class="com.sap.cleancore.analyzer.ui.CleanCoreAnalyzerView"
+            allowMultiple="false"
+            restorable="true">
+      </view>
+      <view
+            id="com.sap.cleancore.analyzer.mappingView"
+            name="Mapping Maintenance"
+            category="com.sap.cleancore.analyzer.category"
+            class="com.sap.cleancore.analyzer.ui.MappingMaintenanceView"
+            allowMultiple="false"
+            restorable="true">
+      </view>
    </extension>
    <extension
          point="org.eclipse.ui.perspectiveExtensions">
@@ -25,6 +45,18 @@
                relative="org.eclipse.ui.views.ContentOutline"
                relationship="stack">
          </view>
+         <view
+               id="com.sap.cleancore.analyzer.analyzerView"
+               relative="org.eclipse.ui.views.ContentOutline"
+               relationship="stack">
+         </view>
       </perspectiveExtension>
+   </extension>
+   <extension point="org.eclipse.ui.preferencePages">
+      <page
+            id="com.sap.cleancore.analyzer.preferences"
+            name="Clean Core Analyzer"
+            class="com.sap.cleancore.analyzer.preferences.CleanCorePreferencePage">
+      </page>
    </extension>
 </plugin>

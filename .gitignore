@@ -2,13 +2,11 @@
 bin/
 *.class
 
-# Eclipse project files
-.project
-.classpath
+# Eclipse workspace metadata (kept .project/.classpath so others can import the project)
 .settings/
 .metadata/
 
-# Eclipse plugin build output
+# Build output
 target/
 build/
 *.jar

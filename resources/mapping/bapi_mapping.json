@@ -1,0 +1,144 @@
+{
+  "_comment": "Baseline BAPI -> modern API mappings (S/4HANA cloud-released or RAP equivalents).",
+  "entries": [
+    {
+      "legacyName": "BAPI_SALESORDER_CREATEFROMDAT2",
+      "legacyType": "BAPI",
+      "modernName": "API_SALES_ORDER_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED",
+      "documentationUrl": "https://api.sap.com/api/API_SALES_ORDER_SRV",
+      "notes": "OData v2. For RAP-native code use I_SalesOrderTP."
+    },
+    {
+      "legacyName": "BAPI_SALESORDER_CHANGE",
+      "legacyType": "BAPI",
+      "modernName": "API_SALES_ORDER_SRV (PATCH)",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_SALESORDER_GETLIST",
+      "legacyType": "BAPI",
+      "modernName": "API_SALES_ORDER_SRV (GET collection)",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_MATERIAL_SAVEDATA",
+      "legacyType": "BAPI",
+      "modernName": "API_PRODUCT_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED",
+      "notes": "In S/4 'material' became 'product'."
+    },
+    {
+      "legacyName": "BAPI_MATERIAL_GET_DETAIL",
+      "legacyType": "BAPI",
+      "modernName": "API_PRODUCT_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_BUSPROCESSND_CREATEMULTI",
+      "legacyType": "BAPI",
+      "modernName": "API_BUSINESS_PARTNER",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_CUSTOMER_CREATEFROMDATA1",
+      "legacyType": "BAPI",
+      "modernName": "API_BUSINESS_PARTNER",
+      "modernType": "API_ODATA",
+      "releaseState": "DEPRECATED",
+      "notes": "Customer/Vendor merged into Business Partner in S/4."
+    },
+    {
+      "legacyName": "BAPI_VENDOR_CREATE",
+      "legacyType": "BAPI",
+      "modernName": "API_BUSINESS_PARTNER",
+      "modernType": "API_ODATA",
+      "releaseState": "DEPRECATED"
+    },
+    {
+      "legacyName": "BAPI_ACC_DOCUMENT_POST",
+      "legacyType": "BAPI",
+      "modernName": "API_JOURNALENTRYITEMBASIC_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_PO_CREATE1",
+      "legacyType": "BAPI",
+      "modernName": "API_PURCHASEORDER_PROCESS_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_PO_CHANGE",
+      "legacyType": "BAPI",
+      "modernName": "API_PURCHASEORDER_PROCESS_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_PR_CREATE",
+      "legacyType": "BAPI",
+      "modernName": "API_PURCHASEREQ_PROCESS_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_GOODSMVT_CREATE",
+      "legacyType": "BAPI",
+      "modernName": "API_MATERIAL_DOCUMENT_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_DELIVERYPROCESSING_EXEC",
+      "legacyType": "BAPI",
+      "modernName": "API_OUTBOUND_DELIVERY_SRV_V2",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_INCOMINGINVOICE_CREATE1",
+      "legacyType": "BAPI",
+      "modernName": "API_SUPPLIERINVOICE_PROCESS_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_BILLINGDOC_CREATEMULTIPLE",
+      "legacyType": "BAPI",
+      "modernName": "API_BILLING_DOCUMENT_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_PRODORD_CREATE",
+      "legacyType": "BAPI",
+      "modernName": "API_PRODUCTION_ORDER_2_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "BAPI_USER_GET_DETAIL",
+      "legacyType": "BAPI",
+      "modernName": "Identity Authentication API",
+      "modernType": "API_REST",
+      "releaseState": "DEPRECATED",
+      "notes": "User management moved to IAS/IPS in cloud."
+    },
+    {
+      "legacyName": "BAPI_TRANSACTION_COMMIT",
+      "legacyType": "BAPI",
+      "modernName": "COMMIT ENTITIES",
+      "modernType": "KEEP_AS_IS",
+      "releaseState": "RELEASED",
+      "notes": "In RAP managed scenarios commit is handled by behavior implementation."
+    }
+  ]
+}

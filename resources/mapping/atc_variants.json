@@ -1,0 +1,26 @@
+{
+  "_comment": "Known ATC check variants for Clean Core readiness. Used as defaults; user can override in preferences.",
+  "variants": [
+    {
+      "name": "S4HANA_READINESS_REMOTE",
+      "description": "Standard check variant for S/4HANA on-premise readiness (remote ATC).",
+      "appliesTo": ["ECC", "S4HANA"],
+      "preferred": true
+    },
+    {
+      "name": "S4HANA_READINESS_2023",
+      "description": "S/4HANA 2023 release-specific readiness checks.",
+      "appliesTo": ["ECC", "S4HANA"]
+    },
+    {
+      "name": "ABAP_CLOUD_READINESS_REMOTE",
+      "description": "Checks for ABAP Cloud / RISE clean-core compliance.",
+      "appliesTo": ["S4HANA", "BTP"]
+    },
+    {
+      "name": "SAP_CP_READINESS_REMOTE",
+      "description": "Steampunk / Cloud Platform readiness checks.",
+      "appliesTo": ["BTP"]
+    }
+  ]
+}

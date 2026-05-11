@@ -16,6 +16,13 @@ public class Activator extends AbstractUIPlugin {
     public void start(BundleContext context) throws Exception {
         super.start(context);
         plugin = this;
+        // Kick off background load of SAP Cloudification + api.sap.com data so
+        // the user does not need to click "Sync" on every plug-in launch.
+        try {
+            com.sap.cleancore.analyzer.CleanCoreBootstrapper.runOnce();
+        } catch (Throwable ignored) {
+            // bootstrap must never block the UI
+        }
     }
 
     @Override

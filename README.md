@@ -1,77 +1,100 @@
-# SAP RAP Code Generator - Eclipse Plugin
+# SAP Clean Core Analyzer + RAP Code Generator
 
-Eclipse ADT plugin that generates SAP ABAP RAP (RESTful Application Programming) applications from user inputs. Define your entities, fields, and service configuration through a guided UI, then generate all required ABAP RAP artifacts in one step.
+Eclipse ADT plug-in. Tek bir bundle altında iki view:
 
-## Features
+1. **Clean Core Analyzer** — SAP müşterilerinin Z* geliştirmelerini tarar, S/4HANA / RISE migration için clean-core karşılıklarını ve efor tahminini çıkarır. ATC destekli olmayan eski sistemlerde (R/3) bile bundled static analyzer + SAP Cloudification Repository mapping ile çalışır.
+2. **RAP Code Generator** — RAP (RESTful ABAP Programming) entity'lerini şablondan üretir.
 
-- **CDS Field Fetching** - Fetch field definitions from existing CDS views via local cache or ADT connection
-- **Complete RAP Artifact Generation** - Generates all 7 core artifacts:
-  1. CDS Data Model (Interface View)
-  2. CDS Projection View
-  3. Metadata Extension
-  4. Behavior Definition
-  5. Behavior Implementation
-  6. Service Definition
-  7. Service Binding
-- **Draft Support** - Optional draft enablement for generated RAP applications
-- **Multi-Entity Support** - Define and manage multiple entities with parent-child relationships
-- **Custom Actions** - Add custom actions with configurable placement and parameters
-- **UI Annotation Configuration** - Configure UI annotations for list reports and object pages
-- **ABAP Naming Validation** - Built-in validation for ABAP naming conventions
-- **Release Contract Checking** - Check release status and successors for SAP objects
-- **Code Formatting** - Generated code follows ABAP formatting best practices
-- **Export Capability** - Export generated artifacts for use in your SAP system
+## Özellikler — Clean Core Analyzer
 
-## Installation
+- **Plug-and-play mapping havuzu**: ilk açılışta otomatik olarak SAP'nin resmi [`Cloudification Repository`](https://sap.github.io/abap-atc-cr-cv-s4hc/) ve api.sap.com kataloğundan binlerce mapping indirilir (`~/.rap-generator/sap-release-data.json`'a cache). Müşteri sisteminin internet erişimi gerekmez.
+- **AnalysisWizardDialog**: Full Z*/Y* scan / Package prefix / Single object scope. Object types (Reports, FMs, Classes, ...) checkbox.
+- **Background Job**: UI donmaz, Cancel butonu Eclipse Progress view'da.
+- **Mapping Maintenance UI**: Arama, manuel CRUD, "Sync from SAP Cloudification Repo" butonu — USER override'lar korunur.
+- **Export**: CSV / JSON.
+- **Effort Estimation**: S/M/L/XL kategori bazlı MD tahmini (preferences'tan katsayılar değiştirilebilir).
+- **Static analyzer fallback**: ATC yoksa bundled kurallar (SELECT *, NATIVE SQL, CALL SCREEN vs.)
 
-### Dropins Method
+## Kurulum (geliştirme için)
 
-1. Build the plugin or obtain the plugin JAR file
-2. Copy the JAR file to your Eclipse installation's `dropins/` folder:
+### Gereksinimler
+- Eclipse IDE (2024-09 veya üstü) + SAP ABAP Development Tools (ADT)
+- Java 11+
+
+### Adımlar
+1. Bu repo'yu klonla:
+   ```bash
+   git clone https://github.com/gzmilgar/CleanCorePlugIn.git
    ```
-   <eclipse-install-dir>/dropins/com.rap.generator_1.0.0.jar
-   ```
-3. Restart Eclipse
-4. The **RAP Code Generator** view will be available under **Window > Show View > SAP RAP Generator**
+2. Eclipse'i aç → **File → Import → General → Existing Projects into Workspace**
+3. Klonlanan dizini seç → Finish.
+4. Proje workspace'e gelir. Otomatik build başlar.
+5. **Run → Run As → Eclipse Application** → yeni Eclipse instance açılır, plugin yüklü.
+6. Yeni instance'ta: **Window → Show View → Other → SAP Clean Core → Clean Core Analyzer**.
 
-### Requirements
+## Kullanım
 
-- Eclipse IDE with ADT (ABAP Development Tools) installed
-- Java 11 or later
-- SAP system connection configured in ADT (for field fetching)
+### İlk kez
+1. Plugin ilk açılışta arka planda SAP Cloudification Repo + api.sap.com cache'ler (30 sn).
+2. **Clean Core Analyzer** view → **Connect** → ABAP project dropdown'undan müşteri sistemini seç → OK.
+3. **Run Analysis** → wizard'da scope seç (Full / Package prefix / Single object) → OK.
+4. Tablo dolar. Satıra tıkla → alt panelde Findings / Recommended Mappings / Reasoning.
+5. **Export CSV/JSON** ile dış sisteme aktar.
 
-## Usage
+### Mapping aramaları
+- **Mapping Maintenance** view → arama: `BSEG`, `BAPI_SALESORDER`, `VBAK`, `MARA` vs. — SAP'nin önerdiği successor görünür.
+- Manuel mapping ekleyebilirsin (USER override).
+- "Sync from SAP Cloudification Repo" butonu ile mapping havuzunu güncelle.
 
-1. Open the RAP Code Generator view from **Window > Show View > SAP RAP Generator**
-2. **Configure Connection** - Set up your SAP system connection for CDS field fetching (optional)
-3. **Define Entities** - Add entities and configure their fields, either manually or by fetching from existing CDS views
-4. **Configure Actions** - Add custom actions to your entities as needed
-5. **Set UI Annotations** - Configure list report and object page annotations
-6. **Configure Service** - Set service definition and binding parameters
-7. **Generate** - Click generate to produce all RAP artifacts
-8. **Review & Export** - Review the generated code in the output panel and export to your project
+## Bilinen sınırlamalar
 
-## Screenshots
+- **SAProuter-only sistemlere doğrudan erişim**: Plain HTTP (Java's HttpURLConnection) SAProuter tunnelling'i desteklemiyor. Bu durumda Run Analysis hata verir. Çözüm:
+  - VPN ile müşteri network'üne bağlan, veya
+  - Doğrudan erişilebilir bir sistem kullan (BTP ABAP Trial, S/4HANA Cloud demo).
+- **Mapping Maintenance** her zaman offline çalışır — sistem bağlantısından bağımsız değerli.
 
-<!-- Add screenshots here -->
+## Plugin'i JAR olarak export et (dağıtım için)
 
-## Project Structure
+1. Host Eclipse'te `com.rap.generator` üzerine sağ tık → **Export → Plug-in Development → Deployable plug-ins and fragments**
+2. `com.rap.generator (1.0.0.qualifier)` ✓ seç
+3. Destination: bir dizin (örn. `~/Desktop/cleancore-plugin-dist`)
+4. Options → **Use class files compiled in the workspace** ✓
+5. Finish → `plugins/com.rap.generator_1.0.0.YYYYMMDD.jar` üretilir
+6. Başka bir Eclipse'in `dropins/` klasörüne kopyala → restart → plugin yüklü gelir
+
+## Proje yapısı
 
 ```
 com.rap.generator/
-  META-INF/           - Plugin manifest
-  src/                - Java source code
-    com/rap/generator/
-      model/          - Data models (RapApplication, EntityDefinition, etc.)
-      generators/     - Code generators for each artifact type
-      data/           - ADT connection and field fetching services
-      ui/             - SWT-based user interface
-      utils/          - Naming validation, type registry, utilities
-  lib/                - Third-party libraries
-  resources/          - Plugin resources
-  plugin.xml          - Eclipse extension point declarations
+├── META-INF/MANIFEST.MF
+├── plugin.xml
+├── build.properties
+├── .project, .classpath  (Eclipse import için gerekli)
+├── resources/
+│   ├── mapping/
+│   │   ├── fm_mapping.json
+│   │   ├── bapi_mapping.json
+│   │   ├── object_rules.json
+│   │   └── atc_variants.json
+│   ├── data/
+│   └── icons/
+└── src/
+    ├── com/rap/generator/        ← RAP Code Generator
+    │   ├── Activator.java
+    │   ├── data/, generators/, model/, ui/, utils/
+    └── com/sap/cleancore/analyzer/  ← Clean Core Analyzer
+        ├── CleanCoreBootstrapper.java
+        ├── analyzers/    StaticAbapAnalyzer, ObsoleteApiDetector, ...
+        ├── collectors/   ZObjectCollector, AnalysisService, ...
+        ├── data/         AdtConnectionService, CapabilityDetector
+        ├── effort/       EffortEstimator, EffortRules
+        ├── mapping/      MappingRepository, SapApiHubClient, SapCloudificationBridge
+        ├── model/        ZObject, AnalysisRun, MappingEntry, AnalysisFilter, ...
+        ├── preferences/  CleanCorePreferencePage
+        ├── ui/           CleanCoreAnalyzerView, MappingMaintenanceView, ConnectionDialog, AnalysisWizardDialog
+        └── utils/        SimpleJsonParser, JsonWriter, ExportUtil, ResourceLoader
 ```
 
-## License
+## Lisans
 
-All rights reserved.
+Tüm hakları saklıdır.

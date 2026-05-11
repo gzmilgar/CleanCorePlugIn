@@ -1,0 +1,151 @@
+{
+  "_comment": "Baseline legacy FM -> modern API mappings for SAP Clean Core migration. Augmented at runtime by api.sap.com sync and user maintenance. Source values: BASELINE (this file), API_HUB, USER.",
+  "entries": [
+    {
+      "legacyName": "ALV_GRID_DISPLAY",
+      "legacyType": "FM",
+      "modernName": "CL_SALV_TABLE",
+      "modernType": "CLASS",
+      "releaseState": "RELEASED",
+      "notes": "Modern fullscreen ALV. Use cl_salv_table=>factory."
+    },
+    {
+      "legacyName": "REUSE_ALV_GRID_DISPLAY",
+      "legacyType": "FM",
+      "modernName": "CL_SALV_TABLE",
+      "modernType": "CLASS",
+      "releaseState": "DEPRECATED",
+      "notes": "Replace with cl_salv_table for grid; cl_salv_hierseq_table for hierarchical."
+    },
+    {
+      "legacyName": "REUSE_ALV_FIELDCATALOG_MERGE",
+      "legacyType": "FM",
+      "modernName": "CL_SALV_TABLE",
+      "modernType": "CLASS",
+      "releaseState": "DEPRECATED",
+      "notes": "Field catalogue derived automatically via cl_salv_table->get_columns()."
+    },
+    {
+      "legacyName": "POPUP_TO_CONFIRM",
+      "legacyType": "FM",
+      "modernName": "CL_GUI_POPUP",
+      "modernType": "CLASS",
+      "releaseState": "RELEASED",
+      "notes": "For Fiori UIs, popups are not allowed; redesign as RAP/Fiori dialog."
+    },
+    {
+      "legacyName": "F4_DATE",
+      "legacyType": "FM",
+      "modernName": "F4_DATE",
+      "modernType": "KEEP_AS_IS",
+      "releaseState": "RELEASED",
+      "notes": "Still released; safe to keep in classic ABAP. Not callable from Cloud."
+    },
+    {
+      "legacyName": "READ_TEXT",
+      "legacyType": "FM",
+      "modernName": "READ_TEXT",
+      "modernType": "KEEP_AS_IS",
+      "releaseState": "RELEASED",
+      "notes": "Standard text reader; released. Cloud equivalent: CDS for long texts or API_LONGTEXT."
+    },
+    {
+      "legacyName": "SAVE_TEXT",
+      "legacyType": "FM",
+      "modernName": "SAVE_TEXT",
+      "modernType": "KEEP_AS_IS",
+      "releaseState": "RELEASED",
+      "notes": "Released for on-prem. In ABAP Cloud use released APIs."
+    },
+    {
+      "legacyName": "CONVERSION_EXIT_ALPHA_INPUT",
+      "legacyType": "FM",
+      "modernName": "CONVERSION_EXIT_ALPHA_INPUT",
+      "modernType": "KEEP_AS_IS",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "CONVERSION_EXIT_ALPHA_OUTPUT",
+      "legacyType": "FM",
+      "modernName": "CONVERSION_EXIT_ALPHA_OUTPUT",
+      "modernType": "KEEP_AS_IS",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "WS_DOWNLOAD",
+      "legacyType": "FM",
+      "modernName": "CL_GUI_FRONTEND_SERVICES=>GUI_DOWNLOAD",
+      "modernType": "CLASS",
+      "releaseState": "REMOVED",
+      "notes": "WS_DOWNLOAD is obsolete since 6.40. Use cl_gui_frontend_services=>gui_download or for server-side: cl_abap_excel."
+    },
+    {
+      "legacyName": "WS_UPLOAD",
+      "legacyType": "FM",
+      "modernName": "CL_GUI_FRONTEND_SERVICES=>GUI_UPLOAD",
+      "modernType": "CLASS",
+      "releaseState": "REMOVED"
+    },
+    {
+      "legacyName": "GUI_DOWNLOAD",
+      "legacyType": "FM",
+      "modernName": "CL_GUI_FRONTEND_SERVICES=>GUI_DOWNLOAD",
+      "modernType": "CLASS",
+      "releaseState": "RELEASED",
+      "notes": "Frontend only. Server-side downloads via OData/Fiori."
+    },
+    {
+      "legacyName": "SO_NEW_DOCUMENT_SEND_API1",
+      "legacyType": "FM",
+      "modernName": "CL_BCS",
+      "modernType": "CLASS",
+      "releaseState": "DEPRECATED",
+      "notes": "Replace with cl_bcs (Business Communication Service)."
+    },
+    {
+      "legacyName": "SO_DOCUMENT_SEND_API1",
+      "legacyType": "FM",
+      "modernName": "CL_BCS",
+      "modernType": "CLASS",
+      "releaseState": "DEPRECATED"
+    },
+    {
+      "legacyName": "RFC_READ_TABLE",
+      "legacyType": "FM",
+      "modernName": "CDS Views (I_*)",
+      "modernType": "CDS_VIEW",
+      "releaseState": "NOT_RELEASED",
+      "notes": "Direct table read via RFC is anti-pattern. Expose data via released CDS or OData service."
+    },
+    {
+      "legacyName": "POPUP_TO_DECIDE",
+      "legacyType": "FM",
+      "modernName": "CL_GUI_POPUP",
+      "modernType": "CLASS",
+      "releaseState": "DEPRECATED"
+    },
+    {
+      "legacyName": "POPUP_GET_VALUES",
+      "legacyType": "FM",
+      "modernName": "Fiori dialog / Action with input parameters",
+      "modernType": "NO_REPLACEMENT",
+      "releaseState": "DEPRECATED",
+      "notes": "No 1:1 replacement in Cloud; redesign UX."
+    },
+    {
+      "legacyName": "SPELL_AMOUNT",
+      "legacyType": "FM",
+      "modernName": "SPELL_AMOUNT",
+      "modernType": "KEEP_AS_IS",
+      "releaseState": "RELEASED"
+    },
+    {
+      "legacyName": "HR_GETLEAVE_QUOTA",
+      "legacyType": "FM",
+      "modernName": "API_LEAVE_REQUEST_SRV",
+      "modernType": "API_ODATA",
+      "releaseState": "DEPRECATED",
+      "notes": "Use SuccessFactors / Cloud HR APIs in S/4."
+    }
+  ]
+}

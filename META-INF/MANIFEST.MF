@@ -18,4 +18,9 @@ Export-Package: com.rap.generator,
  com.rap.generator.model,
  com.rap.generator.generators,
  com.rap.generator.data,
- com.rap.generator.utils
+ com.rap.generator.utils,
+ com.sap.cleancore.analyzer.model,
+ com.sap.cleancore.analyzer.mapping,
+ com.sap.cleancore.analyzer.effort,
+ com.sap.cleancore.analyzer.analyzers,
+ com.sap.cleancore.analyzer.utils
