@@ -17,10 +17,10 @@ import java.util.Set;
 
 /**
  * Walks the Eclipse ABAP project tree (already populated by ADT in the
- * Project Explorer) and harvests Z*/Y* objects without making a single HTTP
- * call to the SAP system. This is the path that works behind SAProuter / VPN-
- * less networks where ADT itself can manually fetch nodes but our plain
- * HttpURLConnection cannot.
+ * Project Explorer) and harvests Z-star and Y-star objects without making a
+ * single HTTP call to the SAP system. This is the path that works behind
+ * SAProuter / VPN-less networks where ADT itself can manually fetch nodes but
+ * our plain HttpURLConnection cannot.
  *
  * Strategy: project.members(DEPTH_INFINITE) returns IResources that ADT
  * advertises. Each ABAP object is exposed with an IAdtObjectReference
