@@ -72,32 +72,63 @@ public class AnalysisService {
         checkCancel(monitor);
         boolean httpReachable = !caps.isAllUnavailable();
 
-        // 2) Inventory — try the workspace ADT path first (no HTTP). If it
-        //    comes up empty AND HTTP is reachable, fall back to the
-        //    repository search.
+        // 2) Inventory — combine BOTH sources so the user gets every Z*/Y*
+        //    matching their filter, regardless of whether ADT cached it
+        //    locally or only the remote system knows about it.
+        //
+        //    (a) Workspace ADT path: open editors + IResource walk — no HTTP.
+        //    (b) HTTP TADIR search: queries /sap/bc/adt/repository/.../search
+        //        for every matching Z*/Y* in the system; only attempted when
+        //        the discovery probe succeeded (httpReachable). Skipped on
+        //        SAProuter-only systems where it would just time out.
+        //
+        //    Both lists are de-duplicated by upper-case object name.
         monitor.subTask("Collecting Z* inventory from ADT workspace...");
         progress(listener, 0, 1, "Collecting Z* inventory from ADT workspace...");
         List<ZObject> objects = workspaceCollector.collect(filter);
         boolean usedWorkspace = !objects.isEmpty();
-        if (objects.isEmpty()) {
-            if (httpReachable) {
-                monitor.subTask("Workspace empty — falling back to HTTP TADIR search...");
-                progress(listener, 0, 1, "Falling back to HTTP TADIR search...");
-                objects = zCollector.collect(filter);
-            } else {
-                throw new Exception(
-                        "No Z*/Y* objects found.\n\n"
-                      + "Likely causes:\n"
-                      + "  - You haven't opened the target package(s) in Project Explorer yet,\n"
-                      + "    so ADT hasn't cached them. Expand the package node first, then re-run.\n"
-                      + "  - The package prefix filter in the wizard didn't match any package\n"
-                      + "    that is currently visible in this ABAP project's tree.\n"
-                      + "  - The system is behind SAProuter and the plug-in's HTTP client\n"
-                      + "    cannot reach it; the ADT workspace cache was empty too.\n\n"
-                      + "Tip: open the package(s) you want to analyse in Project Explorer\n"
-                      + "(double-click a Z program to confirm ADT can resolve them), then\n"
-                      + "re-run with the package prefix.");
+
+        if (httpReachable) {
+            monitor.subTask("Also querying TADIR over HTTP...");
+            progress(listener, 0, 1, "Also querying TADIR over HTTP...");
+            try {
+                List<ZObject> http = zCollector.collect(filter);
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                for (ZObject z : objects) {
+                    if (z.getName() != null) seen.add(z.getName().toUpperCase(java.util.Locale.ROOT));
+                }
+                int added = 0;
+                for (ZObject z : http) {
+                    if (z.getName() == null) continue;
+                    if (seen.add(z.getName().toUpperCase(java.util.Locale.ROOT))) {
+                        objects.add(z);
+                        added++;
+                    }
+                }
+                progress(listener, 0, 1, "HTTP TADIR added " + added
+                        + " new object(s) to " + (objects.size() - added) + " from workspace.");
+            } catch (Exception httpEx) {
+                // HTTP path failed (timeout / firewall) — keep the workspace
+                // results without aborting.
+                progress(listener, 0, 1,
+                        "HTTP TADIR failed (" + httpEx.getMessage()
+                      + "); using workspace results only.");
             }
+        }
+
+        if (objects.isEmpty()) {
+            throw new Exception(
+                    "No Z*/Y* objects found.\n\n"
+                  + "Likely causes:\n"
+                  + "  - You haven't opened the target package(s) in Project Explorer yet,\n"
+                  + "    so ADT hasn't cached them. Expand the package node first, then re-run.\n"
+                  + "  - The package prefix filter in the wizard didn't match any package\n"
+                  + "    that is currently visible in this ABAP project's tree.\n"
+                  + "  - The system is behind SAProuter and the plug-in's HTTP client\n"
+                  + "    cannot reach it; the ADT workspace cache was empty too.\n\n"
+                  + "Tip: open the package(s) you want to analyse in Project Explorer\n"
+                  + "(double-click a Z program to confirm ADT can resolve them), then\n"
+                  + "re-run with the package prefix.");
         }
         checkCancel(monitor);
 
