@@ -64,23 +64,31 @@ public class WorkspaceAdtCollector {
      */
     private void collectFromOpenEditors(AnalysisFilter filter,
                                          List<ZObject> out, Set<String> seen) {
+        // PlatformUI APIs must be touched on the UI thread.
         try {
-            IWorkbenchWindow[] windows = PlatformUI.getWorkbench().getWorkbenchWindows();
-            for (IWorkbenchWindow win : windows) {
-                if (win == null) continue;
-                for (IWorkbenchPage page : win.getPages()) {
-                    if (page == null) continue;
-                    for (IEditorReference ref : page.getEditorReferences()) {
-                        if (ref == null) continue;
-                        String editorName = ref.getName();
-                        if (editorName == null || editorName.isEmpty()) continue;
-                        ZObject z = fromEditorName(editorName);
-                        if (z == null) continue;
-                        if (!matchesFilter(z, filter)) continue;
-                        if (seen.add(z.getName().toUpperCase(Locale.ROOT))) out.add(z);
+            org.eclipse.swt.widgets.Display display =
+                    org.eclipse.swt.widgets.Display.getDefault();
+            if (display == null) return;
+            display.syncExec(() -> {
+                try {
+                    IWorkbenchWindow[] windows = PlatformUI.getWorkbench().getWorkbenchWindows();
+                    for (IWorkbenchWindow win : windows) {
+                        if (win == null) continue;
+                        for (IWorkbenchPage page : win.getPages()) {
+                            if (page == null) continue;
+                            for (IEditorReference ref : page.getEditorReferences()) {
+                                if (ref == null) continue;
+                                String editorName = ref.getName();
+                                if (editorName == null || editorName.isEmpty()) continue;
+                                ZObject z = fromEditorName(editorName);
+                                if (z == null) continue;
+                                if (!matchesFilter(z, filter)) continue;
+                                if (seen.add(z.getName().toUpperCase(Locale.ROOT))) out.add(z);
+                            }
+                        }
                     }
-                }
-            }
+                } catch (Throwable ignored) {}
+            });
         } catch (Throwable ignored) {}
     }
 

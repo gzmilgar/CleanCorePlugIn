@@ -86,7 +86,7 @@ public class AnalyzeAllOpenEditorsHandler extends AbstractHandler {
                     if (page == null) continue;
                     for (IEditorReference ref : page.getEditorReferences()) {
                         if (ref == null) continue;
-                        IEditorPart editor = ref.getEditor(false);
+                        IEditorPart editor = ref.getEditor(true);
                         if (editor == null) continue;
                         String source = extractSource(editor);
                         if (source != null && !source.isEmpty()) {

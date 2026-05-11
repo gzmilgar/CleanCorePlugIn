@@ -88,28 +88,42 @@ public class AdtResourceSourceFetcher {
      * as AnalyzeCurrentFileHandler.
      */
     private String readFromOpenEditor(ZObject obj) {
+        // PlatformUI APIs (and any IEditorPart/IDocument access) must run on
+        // the SWT UI thread. Background jobs that call this method come from a
+        // worker thread, so we hop onto the display via syncExec.
+        final String[] result = { null };
         try {
-            String target = obj.getName().toUpperCase(Locale.ROOT);
-            for (IWorkbenchWindow win : PlatformUI.getWorkbench().getWorkbenchWindows()) {
-                if (win == null) continue;
-                for (IWorkbenchPage page : win.getPages()) {
-                    if (page == null) continue;
-                    for (IEditorReference ref : page.getEditorReferences()) {
-                        if (ref == null) continue;
-                        String n = ref.getName();
-                        if (n == null) continue;
-                        int dot = n.lastIndexOf('.');
-                        String stem = (dot > 0 ? n.substring(0, dot) : n).toUpperCase(Locale.ROOT);
-                        if (!stem.equals(target)) continue;
-                        IEditorPart editor = ref.getEditor(false);
-                        if (editor == null) continue;
-                        String src = extractSource(editor);
-                        if (src != null && !src.isEmpty()) return src;
+            org.eclipse.swt.widgets.Display display =
+                    org.eclipse.swt.widgets.Display.getDefault();
+            if (display == null) return null;
+            display.syncExec(() -> {
+                try {
+                    String target = obj.getName().toUpperCase(Locale.ROOT);
+                    for (IWorkbenchWindow win : PlatformUI.getWorkbench().getWorkbenchWindows()) {
+                        if (win == null) continue;
+                        for (IWorkbenchPage page : win.getPages()) {
+                            if (page == null) continue;
+                            for (IEditorReference ref : page.getEditorReferences()) {
+                                if (ref == null) continue;
+                                String n = ref.getName();
+                                if (n == null) continue;
+                                int dot = n.lastIndexOf('.');
+                                String stem = (dot > 0 ? n.substring(0, dot) : n).toUpperCase(Locale.ROOT);
+                                if (!stem.equals(target)) continue;
+                                IEditorPart editor = ref.getEditor(true);
+                                if (editor == null) continue;
+                                String src = extractSource(editor);
+                                if (src != null && !src.isEmpty()) {
+                                    result[0] = src;
+                                    return;
+                                }
+                            }
+                        }
                     }
-                }
-            }
+                } catch (Throwable ignored) {}
+            });
         } catch (Throwable ignored) {}
-        return null;
+        return result[0];
     }
 
     /** 5-tier IDocument extraction shared with AnalyzeCurrentFileHandler. */
