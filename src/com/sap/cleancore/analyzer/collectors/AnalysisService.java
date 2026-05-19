@@ -117,18 +117,46 @@ public class AnalysisService {
         }
 
         if (objects.isEmpty()) {
-            throw new Exception(
-                    "No Z*/Y* objects found.\n\n"
-                  + "Likely causes:\n"
-                  + "  - You haven't opened the target package(s) in Project Explorer yet,\n"
-                  + "    so ADT hasn't cached them. Expand the package node first, then re-run.\n"
-                  + "  - The package prefix filter in the wizard didn't match any package\n"
-                  + "    that is currently visible in this ABAP project's tree.\n"
-                  + "  - The system is behind SAProuter and the plug-in's HTTP client\n"
-                  + "    cannot reach it; the ADT workspace cache was empty too.\n\n"
-                  + "Tip: open the package(s) you want to analyse in Project Explorer\n"
-                  + "(double-click a Z program to confirm ADT can resolve them), then\n"
-                  + "re-run with the package prefix.");
+            // Build a diagnostic-rich error so the user knows exactly what
+            // happened — how many editors were inspected, which prefixes were
+            // tried, and a "did you mean" suggestion when names look close.
+            StringBuilder msg = new StringBuilder("No Z*/Y* objects found.\n\n");
+
+            java.util.List<String> editorNames = workspaceCollector.getLastEditorNames();
+            int filteredOut = workspaceCollector.getLastFilteredOut();
+
+            msg.append("Editors currently open in the workbench: ")
+               .append(editorNames.size()).append("\n");
+            if (!editorNames.isEmpty()) {
+                int show = Math.min(editorNames.size(), 8);
+                for (int i = 0; i < show; i++) msg.append("  • ").append(editorNames.get(i)).append("\n");
+                if (editorNames.size() > show) msg.append("  …and ").append(editorNames.size() - show).append(" more\n");
+            }
+
+            msg.append("Filter mode: ").append(filter.getMode());
+            if (filter.getMode() == AnalysisFilter.Mode.PACKAGE_PREFIX) {
+                msg.append("  | prefix(es): ").append(filter.getPackagePrefixes());
+            }
+            msg.append("\n").append(filteredOut).append(" editor(s) were filtered out by the prefix.\n\n");
+
+            // "Did you mean" — extract the leading [A-Z0-9_]* chunk of the
+            // first ABAP-looking editor and suggest a wildcard prefix.
+            String suggestion = suggestPrefix(editorNames);
+            if (suggestion != null) {
+                msg.append("Tip: try the prefix '").append(suggestion)
+                   .append("*' in the wizard, or pick 'Full Z*/Y* scan'.\n\n");
+            }
+
+            msg.append("Other reasons this can happen:\n")
+               .append("  - You haven't opened the target package(s) in Project Explorer yet —\n")
+               .append("    ADT only caches what you've expanded. Expand the package node\n")
+               .append("    and double-click a Z program first, then re-run.\n")
+               .append("  - The system is behind SAProuter and the plug-in's HTTP client\n")
+               .append("    cannot reach it; the workspace cache was the only source.\n")
+               .append("  - The wizard's package prefix didn't match any open editor name\n")
+               .append("    (case-insensitive, treated as startsWith; trailing '*' optional).\n");
+
+            throw new Exception(msg.toString());
         }
         checkCancel(monitor);
 
@@ -222,5 +250,26 @@ public class AnalysisService {
 
     private void progress(ProgressListener l, int done, int total, String msg) {
         if (l != null) l.onProgress(done, total, msg);
+    }
+
+    /**
+     * Pick a sensible prefix suggestion from the first open editor whose name
+     * looks like an ABAP source. e.g. "ZNT_000_CL_001.aclass" → "ZNT_".
+     * Returns null when no suggestion makes sense.
+     */
+    private String suggestPrefix(java.util.List<String> editorNames) {
+        if (editorNames == null || editorNames.isEmpty()) return null;
+        for (String name : editorNames) {
+            if (name == null) continue;
+            int dot = name.lastIndexOf('.');
+            String stem = (dot > 0 ? name.substring(0, dot) : name).toUpperCase(java.util.Locale.ROOT);
+            if (stem.isEmpty()) continue;
+            if (!(stem.startsWith("Z") || stem.startsWith("Y"))) continue;
+            // Prefix up to (and including) the first underscore — useful in
+            // SAP shops that namespace by department: ZNT_, ZFI_, ZMM_, ...
+            int underscore = stem.indexOf('_');
+            return underscore > 0 ? stem.substring(0, underscore + 1) : stem;
+        }
+        return null;
     }
 }

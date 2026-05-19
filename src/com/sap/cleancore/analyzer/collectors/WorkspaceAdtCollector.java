@@ -39,9 +39,22 @@ import java.util.Set;
  */
 public class WorkspaceAdtCollector {
 
+    /**
+     * Last collection's diagnostic summary — populated on every call so
+     * AnalysisService can include it in the user-facing error message when
+     * the run produces zero objects.
+     */
+    private final List<String> lastEditorNames = new ArrayList<>();
+    private int lastFilteredOut = 0;
+
+    public List<String> getLastEditorNames() { return lastEditorNames; }
+    public int getLastFilteredOut() { return lastFilteredOut; }
+
     public List<ZObject> collect(AnalysisFilter filter) {
         List<ZObject> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
+        lastEditorNames.clear();
+        lastFilteredOut = 0;
 
         // ---- Tier 1: open editors (the path that actually works for ADT) ----
         collectFromOpenEditors(filter, out, seen);
@@ -64,31 +77,41 @@ public class WorkspaceAdtCollector {
      */
     private void collectFromOpenEditors(AnalysisFilter filter,
                                          List<ZObject> out, Set<String> seen) {
-        // PlatformUI APIs must be touched on the UI thread.
+        // PlatformUI APIs must be touched on the UI thread; if we're already
+        // there (handler context), call directly to avoid syncExec dead-locks.
         try {
+            org.eclipse.swt.widgets.Display current = org.eclipse.swt.widgets.Display.getCurrent();
+            if (current != null) {
+                doCollectOnUiThread(filter, out, seen);
+                return;
+            }
             org.eclipse.swt.widgets.Display display =
                     org.eclipse.swt.widgets.Display.getDefault();
             if (display == null) return;
-            display.syncExec(() -> {
-                try {
-                    IWorkbenchWindow[] windows = PlatformUI.getWorkbench().getWorkbenchWindows();
-                    for (IWorkbenchWindow win : windows) {
-                        if (win == null) continue;
-                        for (IWorkbenchPage page : win.getPages()) {
-                            if (page == null) continue;
-                            for (IEditorReference ref : page.getEditorReferences()) {
-                                if (ref == null) continue;
-                                String editorName = ref.getName();
-                                if (editorName == null || editorName.isEmpty()) continue;
-                                ZObject z = fromEditorName(editorName);
-                                if (z == null) continue;
-                                if (!matchesFilter(z, filter)) continue;
-                                if (seen.add(z.getName().toUpperCase(Locale.ROOT))) out.add(z);
-                            }
-                        }
+            display.syncExec(() -> doCollectOnUiThread(filter, out, seen));
+        } catch (Throwable ignored) {}
+    }
+
+    private void doCollectOnUiThread(AnalysisFilter filter,
+                                      List<ZObject> out, Set<String> seen) {
+        try {
+            IWorkbenchWindow[] windows = PlatformUI.getWorkbench().getWorkbenchWindows();
+            for (IWorkbenchWindow win : windows) {
+                if (win == null) continue;
+                for (IWorkbenchPage page : win.getPages()) {
+                    if (page == null) continue;
+                    for (IEditorReference ref : page.getEditorReferences()) {
+                        if (ref == null) continue;
+                        String editorName = ref.getName();
+                        if (editorName == null || editorName.isEmpty()) continue;
+                        lastEditorNames.add(editorName);
+                        ZObject z = fromEditorName(editorName);
+                        if (z == null) continue; // not an ABAP file extension
+                        if (!matchesFilter(z, filter)) { lastFilteredOut++; continue; }
+                        if (seen.add(z.getName().toUpperCase(Locale.ROOT))) out.add(z);
                     }
-                } catch (Throwable ignored) {}
-            });
+                }
+            }
         } catch (Throwable ignored) {}
     }
 
@@ -203,10 +226,20 @@ public class WorkspaceAdtCollector {
                 // Open-editor harvest has no package metadata; fall through to
                 // name-based prefix matching so the wizard still gives useful
                 // filtering (e.g. ZNT_000 matches ZNT_000_*).
+                if (filter.getPackagePrefixes() == null || filter.getPackagePrefixes().isEmpty()) {
+                    // Empty prefix list → treat like FULL (don't lose findings)
+                    return true;
+                }
                 for (String prefix : filter.getPackagePrefixes()) {
-                    if (prefix == null || prefix.isEmpty()) continue;
-                    String p = prefix.toUpperCase(Locale.ROOT);
+                    if (prefix == null) continue;
+                    String trimmed = prefix.trim();
+                    if (trimmed.isEmpty()) continue;
+                    // Lone "*" means "match anything"
+                    if ("*".equals(trimmed)) return true;
+                    String p = trimmed.toUpperCase(Locale.ROOT);
+                    // Strip ONE trailing "*"; we treat the prefix as a startsWith
                     if (p.endsWith("*")) p = p.substring(0, p.length() - 1);
+                    if (p.isEmpty()) return true;
                     if (z.getDevClass() != null
                             && z.getDevClass().toUpperCase(Locale.ROOT).startsWith(p)) return true;
                     if (name.startsWith(p)) return true;

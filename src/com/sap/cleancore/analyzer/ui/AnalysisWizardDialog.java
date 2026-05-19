@@ -92,7 +92,14 @@ public class AnalysisWizardDialog extends Dialog {
         pkgText = new Text(modeGrp, SWT.BORDER);
         pkgText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         pkgText.setEnabled(false);
-        pkgText.setText("ZFI_*");
+        pkgText.setMessage("e.g. ZNT_*  or  ZNT_*,ZFI_*");
+        pkgText.setToolTipText(
+                "Prefix matched against object NAME (case-insensitive, startsWith).\n"
+              + "  • Use * as trailing wildcard, e.g. ZNT_* matches ZNT_000_CL_001\n"
+              + "  • Comma-separate multiple prefixes: ZNT_*, ZFI_*\n"
+              + "  • A lone * means 'match everything'.\n"
+              + "Note: open editors are scanned (no HTTP), so the editor file must\n"
+              + "be visible in the workbench for the analyzer to see it.");
 
         modeSingle = new Button(modeGrp, SWT.RADIO);
         modeSingle.setText("Single object (fast — analyze just one Z object)");
