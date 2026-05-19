@@ -65,6 +65,12 @@
             description="Open every Z*/Y* child of the selected ADT package in editors (priming the ADT cache) and analyse them."
             categoryId="com.sap.cleancore.analyzer.commands">
       </command>
+      <command
+            id="com.sap.cleancore.analyzer.analyzeDiskFiles"
+            name="Analyze ABAP Files from Disk..."
+            description="Pick local ABAP source files via a file dialog and analyse them - no SAP connection required (R/3 offline workflow)."
+            categoryId="com.sap.cleancore.analyzer.commands">
+      </command>
    </extension>
    <extension point="org.eclipse.ui.handlers">
       <handler
@@ -78,6 +84,10 @@
       <handler
             commandId="com.sap.cleancore.analyzer.analyzeSelectedPackage"
             class="com.sap.cleancore.analyzer.handlers.AnalyzeSelectedPackageHandler">
+      </handler>
+      <handler
+            commandId="com.sap.cleancore.analyzer.analyzeDiskFiles"
+            class="com.sap.cleancore.analyzer.handlers.AnalyzeDiskFilesHandler">
       </handler>
    </extension>
    <extension point="org.eclipse.ui.bindings">
@@ -101,6 +111,11 @@
             <command
                   commandId="com.sap.cleancore.analyzer.analyzeAllOpenEditors"
                   label="Analyze All Open Editors"
+                  style="push">
+            </command>
+            <command
+                  commandId="com.sap.cleancore.analyzer.analyzeDiskFiles"
+                  label="Analyze ABAP Files from Disk..."
                   style="push">
             </command>
          </menu>

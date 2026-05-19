@@ -235,10 +235,11 @@ public class AnalysisService {
 
             MigrationItem item = new MigrationItem(z);
 
-            // 4a) Source — prefer workspace cache (no HTTP), fall back to HTTP
-            //      fetcher when the workspace path can't resolve it.
-            String src = null;
-            if (usedWorkspace) {
+            // 4a) Source — caller may have set z.setSource(...) up-front
+            //      (e.g. AnalyzeDiskFilesHandler reads from local files).
+            //      Otherwise prefer workspace cache (no HTTP), then HTTP.
+            String src = z.getSource();
+            if (src == null && usedWorkspace) {
                 src = workspaceSource.fetch(z);
             }
             if (src == null && httpReachable) {
