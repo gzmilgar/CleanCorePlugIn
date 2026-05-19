@@ -1,4 +1,4 @@
-package com.rap.generator.data;
+package com.sap.cleancore.analyzer.data;
 
 import java.util.List;
 

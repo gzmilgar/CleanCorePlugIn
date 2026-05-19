@@ -23,6 +23,7 @@ import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.TableViewerColumn;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
@@ -101,8 +102,13 @@ public class CleanCoreAnalyzerView extends ViewPart {
         pgd.minimumWidth = 200;
         progressBar.setLayoutData(pgd);
 
+        // Vertical SashForm so the main table (top) and detail tabs (bottom)
+        // are always both visible and the user can drag the divider.
+        SashForm sash = new SashForm(parent, SWT.VERTICAL);
+        sash.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+
         // Main table
-        mainTable = new TableViewer(parent, SWT.FULL_SELECTION | SWT.BORDER);
+        mainTable = new TableViewer(sash, SWT.FULL_SELECTION | SWT.BORDER);
         mainTable.getTable().setHeaderVisible(true);
         mainTable.getTable().setLinesVisible(true);
         mainTable.getTable().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
@@ -132,12 +138,12 @@ public class CleanCoreAnalyzerView extends ViewPart {
             }
         });
 
-        // Detail tabs
-        TabFolder tabs = new TabFolder(parent, SWT.NONE);
+        // Detail tabs (second pane of the SashForm)
+        TabFolder tabs = new TabFolder(sash, SWT.NONE);
         this.tabFolder = tabs;
-        GridData tgd = new GridData(SWT.FILL, SWT.FILL, true, true);
-        tgd.heightHint = 200;
-        tabs.setLayoutData(tgd);
+
+        // 60% main table, 40% detail tabs. User can drag.
+        sash.setWeights(new int[] { 60, 40 });
 
         TabItem findingsTab = new TabItem(tabs, SWT.NONE);
         findingsTab.setText("Findings");
@@ -196,6 +202,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
         currentFileTable.getTable().setHeaderVisible(true);
         currentFileTable.getTable().setLinesVisible(true);
         currentFileTable.getTable().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        addCol(currentFileTable, "Object",   180, f -> safe(((Finding) f).getObjectName()));
         addCol(currentFileTable, "Severity", 80,  f -> ((Finding) f).getSeverity().name());
         addCol(currentFileTable, "Rule",     70,  f -> safe(((Finding) f).getCheckId()));
         addCol(currentFileTable, "Name",     220, f -> safe(((Finding) f).getRuleName()));
@@ -263,10 +270,10 @@ public class CleanCoreAnalyzerView extends ViewPart {
         } catch (Throwable t) {
             // Surface any silent failure so the user (and Error Log) sees it.
             try {
-                com.rap.generator.Activator.getDefault().getLog().log(
+                com.sap.cleancore.Activator.getDefault().getLog().log(
                         new org.eclipse.core.runtime.Status(
                                 org.eclipse.core.runtime.IStatus.ERROR,
-                                "com.rap.generator",
+                                "com.sap.cleancore",
                                 "Run Analysis failed: " + t.getMessage(), t));
             } catch (Throwable ignored) {}
             MessageDialog.openError(getSite().getShell(), "Run Analysis failed",
@@ -318,12 +325,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
                     if (monitor.isCanceled()) return Status.CANCEL_STATUS;
 
                     // Hand results back to the UI thread
-                    PlatformUI.getWorkbench().getDisplay().asyncExec(() -> {
-                        if (mainTable.getTable().isDisposed()) return;
-                        currentRun = run;
-                        mainTable.setInput(currentRun);
-                        updateStatus();
-                    });
+                    PlatformUI.getWorkbench().getDisplay().asyncExec(() -> showAnalysisRun(run));
                     return Status.OK_STATUS;
                 } catch (org.eclipse.core.runtime.OperationCanceledException oce) {
                     return Status.CANCEL_STATUS;
@@ -333,7 +335,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
                         if (statusLabel.isDisposed()) return;
                         MessageDialog.openError(getSite().getShell(), "Analysis failed", msg);
                     });
-                    return new Status(IStatus.ERROR, "com.rap.generator", msg, ex);
+                    return new Status(IStatus.ERROR, "com.sap.cleancore", msg, ex);
                 }
             }
         };
@@ -392,6 +394,19 @@ public class CleanCoreAnalyzerView extends ViewPart {
             }
         }
         statusLabel.setText(sb.toString());
+    }
+
+    /**
+     * Populate the main table + detail tabs (Findings / Recommended Mappings
+     * / Reasoning) with the given AnalysisRun. Called by both the built-in
+     * Run Analysis flow and external handlers (e.g. Analyze Selected
+     * Package). Must be called on the UI thread.
+     */
+    public void showAnalysisRun(AnalysisRun run) {
+        if (mainTable == null || mainTable.getTable().isDisposed()) return;
+        currentRun = run;
+        mainTable.setInput(currentRun);
+        updateStatus();
     }
 
     /**

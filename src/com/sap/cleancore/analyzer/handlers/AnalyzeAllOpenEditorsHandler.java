@@ -57,8 +57,16 @@ public class AnalyzeAllOpenEditorsHandler extends AbstractHandler {
 
         for (EditorSnapshot snap : snapshots) {
             if (snap.source == null || snap.source.isEmpty()) continue;
-            combined.addAll(staticAnalyzer.analyze(snap.source));
-            combined.addAll(apiDetector.analyze(snap.source).findings);
+            List<Finding> editorFindings = new ArrayList<>();
+            editorFindings.addAll(staticAnalyzer.analyze(snap.source));
+            editorFindings.addAll(apiDetector.analyze(snap.source).findings);
+            String objName = snap.name;
+            if (objName != null) {
+                int dot = objName.lastIndexOf('.');
+                if (dot > 0) objName = objName.substring(0, dot);
+            }
+            for (Finding f : editorFindings) f.setObjectName(objName);
+            combined.addAll(editorFindings);
         }
 
         try {

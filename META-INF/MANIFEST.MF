@@ -1,10 +1,10 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
-Bundle-Name: SAP RAP Code Generator
-Bundle-SymbolicName: com.rap.generator;singleton:=true
+Bundle-Name: SAP Clean Core Analyzer
+Bundle-SymbolicName: com.sap.cleancore;singleton:=true
 Bundle-Version: 1.0.0.qualifier
-Bundle-Activator: com.rap.generator.Activator
-Bundle-Vendor: RAP Generator
+Bundle-Activator: com.sap.cleancore.Activator
+Bundle-Vendor: Clean Core
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,
  org.eclipse.jface,
@@ -12,18 +12,16 @@ Require-Bundle: org.eclipse.ui,
  org.eclipse.core.resources,
  org.eclipse.jface.text,
  org.eclipse.ui.workbench.texteditor,
- org.eclipse.ui.editors
+ org.eclipse.ui.editors,
+ org.eclipse.ui.ide
 Bundle-RequiredExecutionEnvironment: JavaSE-11
-Automatic-Module-Name: com.rap.generator
+Automatic-Module-Name: com.sap.cleancore
 Bundle-ActivationPolicy: lazy
 Bundle-ClassPath: .
-Export-Package: com.rap.generator,
- com.rap.generator.model,
- com.rap.generator.generators,
- com.rap.generator.data,
- com.rap.generator.utils,
+Export-Package: com.sap.cleancore,
  com.sap.cleancore.analyzer.model,
  com.sap.cleancore.analyzer.mapping,
  com.sap.cleancore.analyzer.effort,
  com.sap.cleancore.analyzer.analyzers,
- com.sap.cleancore.analyzer.utils
+ com.sap.cleancore.analyzer.utils,
+ com.sap.cleancore.analyzer.data

@@ -20,7 +20,7 @@ import java.util.List;
  * existing session when possible, otherwise falls back to direct REST against
  * /sap/bc/adt with user-supplied credentials.
  *
- * Pattern adapted from com.rap.generator (same author) -- here we focus on
+ * Standard ADT connection pattern -- here we focus on
  * the set of endpoints we need for Clean Core scanning:
  *   /sap/bc/adt/repository/nodestructure          (package tree)
  *   /sap/bc/adt/programs/programs/<name>/source/main

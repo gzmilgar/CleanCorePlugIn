@@ -121,6 +121,10 @@ public class AnalysisService {
             // happened — how many editors were inspected, which prefixes were
             // tried, and a "did you mean" suggestion when names look close.
             StringBuilder msg = new StringBuilder("No Z*/Y* objects found.\n\n");
+            msg.append("ADT does not expose package contents to external plug-ins; only nodes\n")
+               .append("you have expanded in Project Explorer are visible. Either expand the\n")
+               .append("target package(s) and re-run, or right-click the package \u2192 Clean Core\n")
+               .append("\u2192 Analyze Selected Package.\n\n");
 
             java.util.List<String> editorNames = workspaceCollector.getLastEditorNames();
             int filteredOut = workspaceCollector.getLastFilteredOut();
@@ -172,7 +176,53 @@ public class AnalysisService {
         // Mapping repo
         MappingRepository.getInstance().loadIfNeeded();
 
-        // Prepare per-object work
+        analyseObjects(objects, run, atcByName, usedWorkspace, httpReachable, listener, monitor);
+
+        run.setFinishedAt(LocalDateTime.now().toString());
+        run.recomputeTotals();
+        monitor.done();
+        return run;
+    }
+
+    /**
+     * Runs the full per-object analysis pipeline on a pre-collected list of
+     * ZObjects. Used by handlers (e.g. AnalyzeSelectedPackageHandler) that
+     * have already discovered the objects via the Project Explorer instead
+     * of TADIR/HTTP. Source fetch goes through the workspace tier only
+     * (which works once the handler has opened the objects in editors).
+     */
+    public AnalysisRun runOnObjects(List<ZObject> objects, String runLabel,
+                                    IProgressMonitor monitor) throws Exception {
+        if (monitor == null) monitor = new NullProgressMonitor();
+        if (objects == null) objects = new java.util.ArrayList<>();
+
+        AnalysisRun run = new AnalysisRun();
+        run.setStartedAt(LocalDateTime.now().toString());
+        run.setSystemDisplay(AdtConnectionService.getInstance().getDisplayName());
+        if (runLabel != null) {
+            java.util.List<String> labels = new java.util.ArrayList<>();
+            labels.add(runLabel);
+            run.setPackageFilter(labels);
+        }
+
+        MappingRepository.getInstance().loadIfNeeded();
+        analyseObjects(objects, run, null, true, false, null, monitor);
+
+        run.setFinishedAt(LocalDateTime.now().toString());
+        run.recomputeTotals();
+        return run;
+    }
+
+    /**
+     * Per-object analysis loop shared by {@link #run} and {@link #runOnObjects}.
+     * Fetches source, applies static + obsolete-API + modification analyzers,
+     * attaches recommended mappings, computes effort, and appends a
+     * {@link MigrationItem} to {@code run} for each object.
+     */
+    private void analyseObjects(List<ZObject> objects, AnalysisRun run,
+                                Map<String, List<Finding>> atcByName,
+                                boolean usedWorkspace, boolean httpReachable,
+                                ProgressListener listener, IProgressMonitor monitor) {
         monitor.beginTask("Analyzing Z objects", Math.max(1, objects.size()));
 
         int idx = 0;
@@ -199,11 +249,17 @@ public class AnalysisService {
                 z.setComplexity(complexityCalc.compute(src));
 
                 // 4b) Static rules
-                for (Finding f : staticAnalyzer.analyze(src)) item.addFinding(f);
+                for (Finding f : staticAnalyzer.analyze(src)) {
+                    f.setObjectName(z.getName());
+                    item.addFinding(f);
+                }
 
                 // 4c) Obsolete-API rules (uses MappingRepository)
                 ObsoleteApiDetector.Result apiRes = apiDetector.analyze(src);
-                for (Finding f : apiRes.findings) item.addFinding(f);
+                for (Finding f : apiRes.findings) {
+                    f.setObjectName(z.getName());
+                    item.addFinding(f);
+                }
                 for (com.sap.cleancore.analyzer.model.MappingEntry m : apiRes.matchedMappings) {
                     item.addMapping(m);
                 }
@@ -211,12 +267,20 @@ public class AnalysisService {
 
             // 4d) Modification (devClass-based)
             Finding modFinding = modDetector.analyze(z);
-            if (modFinding != null) item.addFinding(modFinding);
+            if (modFinding != null) {
+                modFinding.setObjectName(z.getName());
+                item.addFinding(modFinding);
+            }
 
             // 4e) ATC findings (if available)
             if (atcByName != null) {
                 List<Finding> atc = atcByName.get(z.getName().toUpperCase());
-                if (atc != null) for (Finding f : atc) item.addFinding(f);
+                if (atc != null) {
+                    for (Finding f : atc) {
+                        f.setObjectName(z.getName());
+                        item.addFinding(f);
+                    }
+                }
             }
 
             // 4f) Effort
@@ -225,11 +289,6 @@ public class AnalysisService {
             run.addItem(item);
             monitor.worked(1);
         }
-
-        run.setFinishedAt(LocalDateTime.now().toString());
-        run.recomputeTotals();
-        monitor.done();
-        return run;
     }
 
     /** Backwards-compatible legacy overload (used to be called with List<String>). */

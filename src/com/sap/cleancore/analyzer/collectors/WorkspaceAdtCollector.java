@@ -46,15 +46,19 @@ public class WorkspaceAdtCollector {
      */
     private final List<String> lastEditorNames = new ArrayList<>();
     private int lastFilteredOut = 0;
+    private int lastResourceWalkCount = 0;
 
     public List<String> getLastEditorNames() { return lastEditorNames; }
     public int getLastFilteredOut() { return lastFilteredOut; }
+    /** Number of IResource nodes visited by the Tier 2 walk on the last call. */
+    public int getLastResourceWalkCount() { return lastResourceWalkCount; }
 
     public List<ZObject> collect(AnalysisFilter filter) {
         List<ZObject> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         lastEditorNames.clear();
         lastFilteredOut = 0;
+        lastResourceWalkCount = 0;
 
         // ---- Tier 1: open editors (the path that actually works for ADT) ----
         collectFromOpenEditors(filter, out, seen);
@@ -177,6 +181,7 @@ public class WorkspaceAdtCollector {
         if (members == null) return;
         for (IResource res : members) {
             if (res == null) continue;
+            lastResourceWalkCount++;
             ZObject z = tryAsAdtObject(res);
             if (z != null && matchesFilter(z, filter)
                     && seen.add(z.getName().toUpperCase(Locale.ROOT))) {

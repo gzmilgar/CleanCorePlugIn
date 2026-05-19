@@ -1,6 +1,6 @@
 package com.sap.cleancore.analyzer.mapping;
 
-import com.rap.generator.Activator;
+import com.sap.cleancore.Activator;
 import com.sap.cleancore.analyzer.model.MappingEntry;
 import com.sap.cleancore.analyzer.utils.JsonWriter;
 import com.sap.cleancore.analyzer.utils.ResourceLoader;

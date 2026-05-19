@@ -1,4 +1,4 @@
-package com.rap.generator;
+package com.sap.cleancore;
 
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
@@ -6,7 +6,7 @@ import org.osgi.framework.BundleContext;
 
 public class Activator extends AbstractUIPlugin {
 
-    public static final String PLUGIN_ID = "com.rap.generator";
+    public static final String PLUGIN_ID = "com.sap.cleancore";
     private static Activator plugin;
 
     public Activator() {

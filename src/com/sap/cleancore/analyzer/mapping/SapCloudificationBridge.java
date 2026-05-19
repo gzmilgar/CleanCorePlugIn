@@ -1,7 +1,7 @@
 package com.sap.cleancore.analyzer.mapping;
 
-import com.rap.generator.data.ReleaseObject;
-import com.rap.generator.data.SapReleaseDataService;
+import com.sap.cleancore.analyzer.data.ReleaseObject;
+import com.sap.cleancore.analyzer.data.SapReleaseDataService;
 import com.sap.cleancore.analyzer.model.MappingEntry;
 
 import java.util.ArrayList;
@@ -11,7 +11,7 @@ import java.util.Locale;
 /**
  * Adapter that pulls SAP's official Cloudification Repository data
  * (https://sap.github.io/abap-atc-cr-cv-s4hc/) via the existing
- * com.rap.generator.data.SapReleaseDataService and converts the
+ * com.sap.cleancore.analyzer.data.SapReleaseDataService and converts the
  * tadirObject/successor entries into our MappingEntry model.
  *
  * The upstream JSON shape:

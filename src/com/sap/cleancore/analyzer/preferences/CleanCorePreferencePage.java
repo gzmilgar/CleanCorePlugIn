@@ -1,6 +1,6 @@
 package com.sap.cleancore.analyzer.preferences;
 
-import com.rap.generator.Activator;
+import com.sap.cleancore.Activator;
 import com.sap.cleancore.analyzer.effort.EffortRules;
 import com.sap.cleancore.analyzer.model.ZObjectType;
 import org.eclipse.jface.preference.PreferencePage;

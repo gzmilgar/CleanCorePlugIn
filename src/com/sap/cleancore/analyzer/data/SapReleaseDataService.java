@@ -1,6 +1,6 @@
-package com.rap.generator.data;
+package com.sap.cleancore.analyzer.data;
 
-import com.rap.generator.utils.SimpleJsonParser;
+import com.sap.cleancore.analyzer.utils.SimpleJsonParser;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -120,17 +120,17 @@ public class SapReleaseDataService {
 
         SimpleJsonParser parser = new SimpleJsonParser(json);
         Map<String, Object> root = parser.parseObject();
-        List<Map<String, Object>> items = SimpleJsonParser.getArray(root, "objectReleaseInfo");
+        List<Map<String, Object>> items = SimpleJsonParser.arr(root, "objectReleaseInfo");
 
         for (Map<String, Object> item : items) {
             ReleaseObject obj = new ReleaseObject();
-            obj.setTadirObject(SimpleJsonParser.getString(item, "tadirObject"));
-            obj.setTadirObjName(SimpleJsonParser.getString(item, "tadirObjName"));
-            obj.setObjectType(SimpleJsonParser.getString(item, "objectType"));
-            obj.setObjectKey(SimpleJsonParser.getString(item, "objectKey"));
-            obj.setSoftwareComponent(SimpleJsonParser.getString(item, "softwareComponent"));
-            obj.setApplicationComponent(SimpleJsonParser.getString(item, "applicationComponent"));
-            obj.setState(SimpleJsonParser.getString(item, "state"));
+            obj.setTadirObject(SimpleJsonParser.str(item, "tadirObject"));
+            obj.setTadirObjName(SimpleJsonParser.str(item, "tadirObjName"));
+            obj.setObjectType(SimpleJsonParser.str(item, "objectType"));
+            obj.setObjectKey(SimpleJsonParser.str(item, "objectKey"));
+            obj.setSoftwareComponent(SimpleJsonParser.str(item, "softwareComponent"));
+            obj.setApplicationComponent(SimpleJsonParser.str(item, "applicationComponent"));
+            obj.setState(SimpleJsonParser.str(item, "state"));
 
             Object successorsRaw = item.get("successors");
             if (successorsRaw instanceof List) {
@@ -139,8 +139,8 @@ public class SapReleaseDataService {
                     if (sRaw instanceof Map) {
                         Map<String, Object> sMap = (Map<String, Object>) sRaw;
                         ReleaseObject.Successor s = new ReleaseObject.Successor();
-                        s.setTadirObject(SimpleJsonParser.getString(sMap, "tadirObject"));
-                        s.setTadirObjName(SimpleJsonParser.getString(sMap, "tadirObjName"));
+                        s.setTadirObject(SimpleJsonParser.str(sMap, "tadirObject"));
+                        s.setTadirObjName(SimpleJsonParser.str(sMap, "tadirObjName"));
                         successors.add(s);
                     }
                 }

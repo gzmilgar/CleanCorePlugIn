@@ -101,6 +101,16 @@ public class AnalysisWizardDialog extends Dialog {
               + "Note: open editors are scanned (no HTTP), so the editor file must\n"
               + "be visible in the workbench for the analyzer to see it.");
 
+        Label pkgHint = new Label(modeGrp, SWT.WRAP);
+        pkgHint.setText(
+                "Note: this plug-in can only see what ADT has already cached. To scan "
+              + "a whole package, first expand it in Project Explorer, OR right-click "
+              + "the package \u2192 Clean Core \u2192 Analyze Selected Package.");
+        GridData pkgHintGd = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        pkgHintGd.horizontalSpan = 2;
+        pkgHintGd.widthHint = 480;
+        pkgHint.setLayoutData(pkgHintGd);
+
         modeSingle = new Button(modeGrp, SWT.RADIO);
         modeSingle.setText("Single object (fast — analyze just one Z object)");
         gd = new GridData();

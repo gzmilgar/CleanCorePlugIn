@@ -261,7 +261,7 @@ public class MappingMaintenanceView extends ViewPart {
                                     "Cloudification Repo Sync failed", msg));
                     return new org.eclipse.core.runtime.Status(
                             org.eclipse.core.runtime.IStatus.ERROR,
-                            "com.rap.generator", msg, ex);
+                            "com.sap.cleancore", msg, ex);
                 } finally {
                     monitor.done();
                 }

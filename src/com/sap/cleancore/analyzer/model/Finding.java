@@ -22,6 +22,7 @@ public class Finding {
     private String suggestion;      // recommendation text (e.g. "MARA -> I_Product")
     private String matchedCode;     // the literal code fragment the rule matched
     private String cleanCoreApi;    // optional modern API hint (e.g. CDS view name)
+    private String objectName;      // the Z/Y object this finding belongs to (populated by bulk-analysis handlers)
 
     public Finding() {}
 
@@ -61,6 +62,9 @@ public class Finding {
 
     public String getCleanCoreApi() { return cleanCoreApi; }
     public void setCleanCoreApi(String cleanCoreApi) { this.cleanCoreApi = cleanCoreApi; }
+
+    public String getObjectName() { return objectName; }
+    public void setObjectName(String objectName) { this.objectName = objectName; }
 
     @Override
     public String toString() {
