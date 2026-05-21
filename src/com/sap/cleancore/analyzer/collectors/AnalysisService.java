@@ -206,7 +206,13 @@ public class AnalysisService {
         }
 
         MappingRepository.getInstance().loadIfNeeded();
-        analyseObjects(objects, run, null, true, false, null, monitor);
+        // HTTP fallback: if an ADT project is connected, try fetching source
+        // via /sap/bc/adt/.../source/main for objects that did NOT get
+        // opened in the workbench (ADT's open silently fails for many
+        // candidates in big packages). Workspace tier still runs first;
+        // HTTP only kicks in when workspace returns null for that object.
+        boolean httpReachable = AdtConnectionService.getInstance().getAdtProject() != null;
+        analyseObjects(objects, run, null, true, httpReachable, null, monitor);
 
         run.setFinishedAt(LocalDateTime.now().toString());
         run.recomputeTotals();
@@ -233,63 +239,80 @@ public class AnalysisService {
             monitor.subTask("Analyzing " + name + " (" + idx + "/" + objects.size() + ")");
             progress(listener, idx, objects.size(), "Analyzing " + name);
 
-            MigrationItem item = new MigrationItem(z);
-
-            // 4a) Source — caller may have set z.setSource(...) up-front
-            //      (e.g. AnalyzeDiskFilesHandler reads from local files).
-            //      Otherwise prefer workspace cache (no HTTP), then HTTP.
-            String src = z.getSource();
-            if (src == null && usedWorkspace) {
-                src = workspaceSource.fetch(z);
-            }
-            if (src == null && httpReachable) {
-                src = sourceFetcher.fetch(z);
-            }
-            if (src != null) {
-                z.setSource(src);
-                z.setComplexity(complexityCalc.compute(src));
-
-                // 4b) Static rules
-                for (Finding f : staticAnalyzer.analyze(src)) {
-                    f.setObjectName(z.getName());
-                    item.addFinding(f);
-                }
-
-                // 4c) Obsolete-API rules (uses MappingRepository)
-                ObsoleteApiDetector.Result apiRes = apiDetector.analyze(src);
-                for (Finding f : apiRes.findings) {
-                    f.setObjectName(z.getName());
-                    item.addFinding(f);
-                }
-                for (com.sap.cleancore.analyzer.model.MappingEntry m : apiRes.matchedMappings) {
-                    item.addMapping(m);
-                }
-            }
-
-            // 4d) Modification (devClass-based)
-            Finding modFinding = modDetector.analyze(z);
-            if (modFinding != null) {
-                modFinding.setObjectName(z.getName());
-                item.addFinding(modFinding);
-            }
-
-            // 4e) ATC findings (if available)
-            if (atcByName != null) {
-                List<Finding> atc = atcByName.get(z.getName().toUpperCase());
-                if (atc != null) {
-                    for (Finding f : atc) {
-                        f.setObjectName(z.getName());
-                        item.addFinding(f);
-                    }
-                }
-            }
-
-            // 4f) Effort
-            estimator.estimate(item);
-
-            run.addItem(item);
+            analyseOneInternal(z, run, atcByName, usedWorkspace, httpReachable);
             monitor.worked(1);
         }
+    }
+
+    /**
+     * Run the full per-object pipeline on a single ZObject. Caller manages
+     * its own progress monitor. atcByName is null for the per-object
+     * (Analyze Selected Package) workflow since ATC is not used there.
+     */
+    public void analyseOne(ZObject z, AnalysisRun run,
+                           boolean usedWorkspace, boolean httpReachable) {
+        analyseOneInternal(z, run, null, usedWorkspace, httpReachable);
+    }
+
+    /** Per-object pipeline body. Shared by analyseObjects and analyseOne. */
+    private void analyseOneInternal(ZObject z, AnalysisRun run,
+                                    Map<String, List<Finding>> atcByName,
+                                    boolean usedWorkspace, boolean httpReachable) {
+        MigrationItem item = new MigrationItem(z);
+
+        // 4a) Source — caller may have set z.setSource(...) up-front
+        //      (e.g. AnalyzeDiskFilesHandler reads from local files).
+        //      Otherwise prefer workspace cache (no HTTP), then HTTP.
+        String src = z.getSource();
+        if (src == null && usedWorkspace) {
+            src = workspaceSource.fetch(z);
+        }
+        if (src == null && httpReachable) {
+            src = sourceFetcher.fetch(z);
+        }
+        if (src != null) {
+            z.setSource(src);
+            z.setComplexity(complexityCalc.compute(src));
+
+            // 4b) Static rules
+            for (Finding f : staticAnalyzer.analyze(src)) {
+                f.setObjectName(z.getName());
+                item.addFinding(f);
+            }
+
+            // 4c) Obsolete-API rules (uses MappingRepository)
+            ObsoleteApiDetector.Result apiRes = apiDetector.analyze(src);
+            for (Finding f : apiRes.findings) {
+                f.setObjectName(z.getName());
+                item.addFinding(f);
+            }
+            for (com.sap.cleancore.analyzer.model.MappingEntry m : apiRes.matchedMappings) {
+                item.addMapping(m);
+            }
+        }
+
+        // 4d) Modification (devClass-based)
+        Finding modFinding = modDetector.analyze(z);
+        if (modFinding != null) {
+            modFinding.setObjectName(z.getName());
+            item.addFinding(modFinding);
+        }
+
+        // 4e) ATC findings (if available)
+        if (atcByName != null && z.getName() != null) {
+            List<Finding> atc = atcByName.get(z.getName().toUpperCase());
+            if (atc != null) {
+                for (Finding f : atc) {
+                    f.setObjectName(z.getName());
+                    item.addFinding(f);
+                }
+            }
+        }
+
+        // 4f) Effort
+        estimator.estimate(item);
+
+        run.addItem(item);
     }
 
     /** Backwards-compatible legacy overload (used to be called with List<String>). */

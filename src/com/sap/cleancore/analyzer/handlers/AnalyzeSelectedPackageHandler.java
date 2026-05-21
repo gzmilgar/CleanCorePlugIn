@@ -2,6 +2,7 @@ package com.sap.cleancore.analyzer.handlers;
 
 import com.sap.cleancore.analyzer.collectors.AnalysisService;
 import com.sap.cleancore.analyzer.data.AdtConnectionService;
+import com.sap.cleancore.analyzer.mapping.MappingRepository;
 import com.sap.cleancore.analyzer.model.AnalysisRun;
 import com.sap.cleancore.analyzer.model.Finding;
 import com.sap.cleancore.analyzer.model.MigrationItem;
@@ -101,7 +102,38 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
                 "Lock Objects", "Kilit Nesneleri",
                 "Views", "Görünümler",
                 "Type Groups", "Tip Grupları",
-                "Type Pools"
+                "Type Pools",
+                // Non-text-source UI / runtime objects that open in native
+                // SAP GUI maintenance screens (SmartForm Maintenance, SE93,
+                // SE91, ...) and would block the analyser with modal dialogs.
+                "Form Objects", "Form-Objekte", "Form Nesneleri",
+                "SmartForms", "Smart Forms", "Akıllı Formlar",
+                "SAPscript Forms", "SAPscript Formları",
+                "Transactions", "İşlemler", "Transaktionen",
+                "Number Ranges", "Numara Serileri", "Nummernkreise",
+                "Message Classes", "İleti Sınıfları", "Nachrichtenklassen",
+                "Authorization Objects", "Yetkilendirme Nesneleri",
+                "Match Codes", "Match-Codes",
+                "Web Dynpro Components", "Web Dynpro Bileşenleri",
+                "OData Services",
+                "Logical Databases", "Mantıksal Veri Tabanları",
+                // Additional GUI-opening categories observed in the field
+                "Area Menus", "Alan Menüleri", "Bereichsmenüs",
+                "Transformations", "Dönüşümler", "Transformationen",
+                "Service Definitions", "Servis Tanımları",
+                "Service Bindings", "Servis Bağlamları",
+                "Enterprise Services", "Kurumsal Servisler",
+                "Enhancement Project", "Geliştirme Projeleri",
+                "Enhancement Spots", "Geliştirme Noktaları",
+                "Enhancements", "Geliştirmeler", "Erweiterungen",
+                "Enhancement Implementations", "Geliştirme Uygulamaları",
+                "Composite Enhancement Implementations",
+                "Bileşik Geliştirme Uygulamaları",
+                "Checkpoint Groups", "Kontrol Noktası Grupları",
+                "Business Add-Ins", "İş Eklentileri",
+                "IDoc Types", "IDoc Tipleri",
+                "Form Painters",
+                "GUI Status", "GUI Titles", "GUI Title"
         }) SKIP_CATEGORY_LABELS.add(s.toLowerCase(Locale.ROOT));
     }
 
@@ -121,12 +153,12 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
                 "Includes",
                 "Function Groups", "Fonksiyon Grupları",
                 "Function Modules",
-                "Enhancement Implementations", "Geliştirme Uygulamaları",
-                "BAdI Implementations", "BAdI Uygulamaları",
-                "Exit Implementations", "Exit Uygulamaları",
                 "Subroutine Pools",
                 "Module Pools",
                 "Type Pools"
+                // Enhancement/BAdI/Exit Implementations excluded - they open
+                // in SAP GUI maintenance screens (SE19 etc.) in many systems
+                // and are skipped via SKIP_CATEGORY_LABELS instead.
         }) CODE_LEAF_CONTAINERS.add(s.toLowerCase(Locale.ROOT));
     }
 
@@ -190,7 +222,8 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
                   + "  - TreeViewer found:   " + (viewer != null) + "\n"
                   + "  - Direct children:    " + diag.topLevelChildren + "\n"
                   + "  - Tree items walked:  " + diag.treeItemsWalked + "\n"
-                  + "  - Nodes visited:      " + diag.visits + "\n"
+                  + "  - Skipped categories: " + diag.skippedCategories + "\n"
+                  + "  - Descended into:     " + diag.descended + "\n"
                   + "  - Leaves seen:        " + diag.leaves
                   + " (Z/Y matched: " + diag.zyLeaves + ")\n";
             asyncInfo(window, "Clean Core - Analyze Selected Package",
@@ -209,57 +242,89 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
             capped = true;
         }
 
-        monitor.beginTask("Analyzing package " + pkgLabel, candidates.size() * 2);
+        // 2) Sequential per-candidate flow: open -> analyse -> close.
+        //    Processing one object at a time lets ADT's editor-creation
+        //    background job complete before the next open call, which is
+        //    far more reliable than the previous "open all 50 then batch
+        //    analyse" approach (most fireOpen calls were silently failing
+        //    when fired in rapid succession). Editors we open are also
+        //    closed afterwards so the workbench stays uncluttered; editors
+        //    the user had open before the run are preserved.
+        boolean httpReachable =
+                AdtConnectionService.getInstance().getAdtProject() != null;
+        AnalysisRun run = new AnalysisRun();
+        run.setStartedAt(java.time.LocalDateTime.now().toString());
+        run.setSystemDisplay(AdtConnectionService.getInstance().getDisplayName());
+        java.util.List<String> labels = new ArrayList<>();
+        labels.add("Package: " + pkgLabel);
+        run.setPackageFilter(labels);
 
-        // 2) Open each candidate in an editor (primes ADT's source cache).
-        int opened = 0;
+        MappingRepository.getInstance().loadIfNeeded();
+        AnalysisService svc = new AnalysisService();
+
+        int alreadyOpen = 0;
+        int openedAndClosed = 0;
+        int couldNotOpen = 0;
+
+        monitor.beginTask("Analyzing package " + pkgLabel, candidates.size());
+        int idx = 0;
         for (Candidate c : candidates) {
             checkCancel(monitor);
-            monitor.subTask("Opening " + c.name);
-            if (openCandidateSync(window, viewer, activePart, c)) opened++;
-            monitor.worked(1);
-        }
-        // Give ADT a moment for the openers to finish loading source.
-        if (opened > 0 && viewer != null) {
-            Display.getDefault().syncExec(() -> pumpEvents(viewer, 1500));
-        }
+            idx++;
+            monitor.subTask("Processing " + c.name + " (" + idx + "/" + candidates.size() + ")");
 
-        // 3) Build ZObject list from candidates and run the full analysis
-        //    pipeline (source fetch + static + obsolete-API + modification +
-        //    mappings + effort) via AnalysisService.runOnObjects(...). The
-        //    workspace source fetcher (tier 1) will pick up the editors we
-        //    just opened above.
-        List<ZObject> zObjects = new ArrayList<>(candidates.size());
-        for (Candidate c : candidates) {
+            boolean wasOpen = isEditorOpenFor(window, c.name);
+            boolean justOpened = false;
+            if (!wasOpen) {
+                if (openCandidateSync(window, viewer, activePart, c)) {
+                    // Let ADT's editor-creation job finish before source fetch.
+                    if (viewer != null) {
+                        Display.getDefault().syncExec(() -> pumpEvents(viewer, 1200));
+                    }
+                    // Confirm by checking the workbench again - fireOpen
+                    // can return true even when ADT silently no-ops.
+                    justOpened = isEditorOpenFor(window, c.name);
+                }
+            }
+            if (wasOpen) alreadyOpen++;
+            else if (justOpened) openedAndClosed++;
+            else couldNotOpen++;
+
             ZObject z = new ZObject();
             z.setName(c.name);
             z.setType(c.type != null ? c.type : ZObjectType.UNKNOWN);
             z.setDevClass(c.devClass != null ? c.devClass : pkgLabel);
-            zObjects.add(z);
+
+            try {
+                svc.analyseOne(z, run, true, httpReachable);
+            } catch (Throwable ignored) {
+                // Keep going on per-object failures; the next candidate
+                // is independent.
+            }
+
+            // Close ONLY the editors we just opened. Pre-existing editors
+            // (wasOpen=true) are preserved exactly as the user left them.
+            if (justOpened) {
+                closeJustOpenedEditor(window, c.name);
+            }
+            monitor.worked(1);
         }
 
-        AnalysisRun run;
-        try {
-            run = new AnalysisService().runOnObjects(
-                    zObjects, "Package: " + pkgLabel, monitor);
-        } catch (Throwable t) {
-            return new Status(IStatus.ERROR, "com.sap.cleancore",
-                    "Analysis pipeline failed: " + t.getMessage(), t);
-        }
+        run.setFinishedAt(java.time.LocalDateTime.now().toString());
+        run.recomputeTotals();
 
-        // Count how many items actually produced findings (proxy for
-        // "successfully fetched + analysed").
+        // Count how many items had source successfully fetched (LOC > 0).
+        // Findings count is NOT the right metric - clean code legitimately
+        // produces zero findings yet was still analysed.
         int analysed = 0;
         List<Finding> combined = new ArrayList<>();
         for (MigrationItem it : run.getItems()) {
-            if (it.getFindings() != null && !it.getFindings().isEmpty()) analysed++;
+            if (it.getzObject() != null && it.getzObject().getLoc() > 0) analysed++;
             if (it.getFindings() != null) combined.addAll(it.getFindings());
         }
 
-        // 4) If nothing could be opened / analysed, show a diagnostic dump
-        //    with the first 3 candidate node classes so we can extend the
-        //    reflection patterns.
-        if (opened == 0 && analysed == 0) {
+        // 3) Diagnostic dump if absolutely nothing was analysed.
+        if (analysed == 0 && openedAndClosed == 0 && alreadyOpen == 0) {
             StringBuilder dbg = new StringBuilder();
             dbg.append("Found ").append(candidates.size())
                .append(" Z/Y candidate(s) but could not open or read any of them.\n\n")
@@ -274,14 +339,16 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
             asyncInfo(window, "Clean Core - Analyze Selected Package", dbg.toString());
         }
 
-        // 5) Push results to the view on the UI thread:
+        // 4) Push results to the view on the UI thread:
         //    - showAnalysisRun  → main table + Findings/Mappings/Reasoning + Export
         //    - showCurrentFileFindings → Current File tab summary (backup view)
         final AnalysisRun runRef = run;
         final List<Finding> findingsRef = combined;
         final int analysedRef = analysed;
-        final int openedRef = opened;
         final int totalRef = candidates.size();
+        final int alreadyOpenRef = alreadyOpen;
+        final int openedClosedRef = openedAndClosed;
+        final int couldNotOpenRef = couldNotOpen;
         final boolean cappedRef = capped;
         Display.getDefault().asyncExec(() -> {
             try {
@@ -290,11 +357,28 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
                 CleanCoreAnalyzerView view =
                         (CleanCoreAnalyzerView) page.showView(CleanCoreAnalyzerView.ID);
                 view.showAnalysisRun(runRef);
-                String label = "Package " + pkgLabel + " - "
-                        + analysedRef + "/" + totalRef + " object(s) analysed"
-                        + " (" + openedRef + " opened)"
-                        + (cappedRef ? " (capped at " + MAX_CHILDREN + ")" : "");
-                view.showCurrentFileFindings(label, findingsRef);
+                StringBuilder lb = new StringBuilder();
+                lb.append("Package ").append(pkgLabel).append(" - ")
+                  .append(analysedRef).append("/").append(totalRef)
+                  .append(" object(s) analysed (");
+                boolean first = true;
+                if (alreadyOpenRef > 0) {
+                    lb.append(alreadyOpenRef).append(" already open");
+                    first = false;
+                }
+                if (openedClosedRef > 0) {
+                    if (!first) lb.append(", ");
+                    lb.append(openedClosedRef).append(" opened+closed");
+                    first = false;
+                }
+                if (couldNotOpenRef > 0) {
+                    if (!first) lb.append(", ");
+                    lb.append(couldNotOpenRef).append(" ADT could not open");
+                }
+                if (first) lb.append("none");
+                lb.append(")");
+                if (cappedRef) lb.append(" (capped at ").append(MAX_CHILDREN).append(")");
+                view.showCurrentFileFindings(lb.toString(), findingsRef);
             } catch (Throwable t) {
                 MessageDialog.openError(window != null ? window.getShell() : null,
                         "Clean Core - Analyze Selected Package",
@@ -322,6 +406,8 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
         int leaves = 0;
         int zyLeaves = 0;
         int treeItemsWalked = 0;
+        int skippedCategories = 0;
+        int descended = 0;
     }
 
     /**
@@ -347,8 +433,13 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
         if (viewer != null) {
             Display.getDefault().syncExec(() -> {
                 try {
-                    viewer.expandToLevel(rootNode, AbstractTreeViewer.ALL_LEVELS);
-                    pumpEvents(viewer, 2500);
+                    // Only expand the root one level so ADT loads the direct
+                    // category children (Source Code Library, Includes, ...).
+                    // BFS below expands each container on demand. Going
+                    // ALL_LEVELS up front asks ADT to lazy-load thousands of
+                    // objects at once; the pump never catches up.
+                    viewer.expandToLevel(rootNode, 1);
+                    pumpEvents(viewer, 2000);
 
                     Tree tree = viewer.getTree();
                     TreeItem rootItem = findItemFor(tree.getItems(), rootNode);
@@ -366,7 +457,10 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
                         if (ti == null || ti.isDisposed()) continue;
 
                         // Skip non-code categories (Dictionary, Texts, ...).
-                        if (isSkippedCategory(ti.getText())) continue;
+                        if (isSkippedCategory(ti.getText())) {
+                            diag.skippedCategories++;
+                            continue;
+                        }
 
                         // If our parent is a code-leaf container (Classes /
                         // Programs / Includes / ...), we ARE an ABAP source
@@ -387,13 +481,14 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
                         }
 
                         // Otherwise we're a container (package, virtual
-                        // folder, sub-package) - force-expand and recurse.
-                        if (!ti.getExpanded()) {
-                            try {
-                                viewer.expandToLevel(ti.getData(), 1);
-                                pumpEvents(viewer, 250);
-                            } catch (Throwable ignored) {}
-                        }
+                        // folder, sub-package) - expand THIS container 2
+                        // levels deep so leaf objects under "Classes" /
+                        // "Programs" are loaded by ADT, then pump.
+                        try {
+                            viewer.expandToLevel(ti.getData(), 2);
+                            pumpEvents(viewer, 1200);
+                        } catch (Throwable ignored) {}
+                        diag.descended++;
                         TreeItem[] kids = ti.getItems();
                         if (kids.length > 0) {
                             for (TreeItem k : kids) q.add(k);
@@ -549,9 +644,13 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
 
     /**
      * Walks the TreeItem parent chain upwards looking for the nearest ADT
-     * package node and returns its name (e.g. "ZNT_020"). Heuristic: the
-     * label's first whitespace-/punctuation-delimited token, when it is NOT a
-     * known category label (Source Code Library, Classes, ...).
+     * package node and returns its name (e.g. "ZNT_020", "Z001"). Beyond
+     * skipping known category labels (Source Code Library, Classes, ...) the
+     * returned token must also LOOK like an ABAP package: all uppercase
+     * letters / digits / underscores, length >= 3, starts with a letter.
+     * This filters out display-only intermediate labels such as "Source",
+     * "Enhancements", "Custom Development" that some ADT layouts insert
+     * between the leaf and the real package node.
      */
     private String findEnclosingPackage(TreeItem leaf) {
         if (leaf == null) return null;
@@ -569,11 +668,37 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
                     if (Character.isWhitespace(ch) || ch == '(' || ch == '-') { cut = i; break; }
                 }
                 String token = first.substring(0, cut);
-                if (!token.isEmpty()) return token;
+                if (looksLikePackageName(token)) return token;
             }
             p = p.getParentItem();
         }
         return null;
+    }
+
+    /**
+     * ABAP package naming: uppercase letter start, then upper/digit/underscore,
+     * length >= 3. Filters out display labels like "Source", "Enhancements".
+     */
+    private boolean looksLikePackageName(String token) {
+        if (token == null || token.length() < 3) return false;
+        char c0 = token.charAt(0);
+        if (!(c0 >= 'A' && c0 <= 'Z')) return false;
+        for (int i = 1; i < token.length(); i++) {
+            char ch = token.charAt(i);
+            boolean ok = (ch >= 'A' && ch <= 'Z')
+                      || (ch >= '0' && ch <= '9')
+                      || ch == '_'
+                      || ch == '/';
+            if (!ok) return false;
+        }
+        // Must contain a digit or underscore OR start with Z/Y - this filters
+        // out single-word English labels like "SOURCE", "ENHANCEMENTS".
+        if (c0 == 'Z' || c0 == 'Y') return true;
+        for (int i = 0; i < token.length(); i++) {
+            char ch = token.charAt(i);
+            if ((ch >= '0' && ch <= '9') || ch == '_' || ch == '/') return true;
+        }
+        return false;
     }
 
     private String cleanedLabel(String label) {
@@ -757,10 +882,16 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
     /**
      * Tries to open the candidate in an editor on the UI thread.
      * Resolution order:
-     *   1) IFile  -> IDE.openEditor
-     *   2) IAdtObjectReference -> ADT NavigationService (reflection)
-     *   3) Late-extract IAdtObjectReference from nodeData and retry (2).
-     *   4) fireOpen on the TreeViewer to invoke any registered IOpenListener
+     *   1) IFile  -> IDE.openEditor (always safe; Eclipse text editor)
+     *   2) Otherwise, the candidate must have a text-source-bearing type
+     *      (see TEXT_SOURCE_TYPES) to proceed. Non-source types like
+     *      SmartForm / Transaction / MessageClass / AreaMenu would open in
+     *      SAP GUI maintenance screens, possibly behind blocking dialogs
+     *      (e.g. Trust Level Classification) that stall the whole package
+     *      analysis. For those we skip the open step.
+     *   3) IAdtObjectReference -> ADT NavigationService (reflection)
+     *   4) Late-extract IAdtObjectReference from nodeData and retry (3).
+     *   5) fireOpen on the TreeViewer to invoke any registered IOpenListener
      *      (this is what ADT uses for Project-Explorer double-click). Does
      *      NOT open any extra dialog - just triggers ADT's own open handler.
      */
@@ -871,6 +1002,90 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
     private void asyncInfo(IWorkbenchWindow window, String title, String msg) {
         Display.getDefault().asyncExec(() ->
                 MessageDialog.openInformation(window != null ? window.getShell() : null, title, msg));
+    }
+
+    /**
+     * Returns true when an open editor's name stem (uppercase) matches the
+     * given candidate name. Used by the per-candidate flow to skip opening
+     * (and skip closing) editors the user already had open.
+     */
+    private boolean isEditorOpenFor(IWorkbenchWindow window, String candidateName) {
+        if (window == null || candidateName == null) return false;
+        final String target = candidateName.toUpperCase(Locale.ROOT);
+        final boolean[] found = { false };
+        Display.getDefault().syncExec(() -> {
+            try {
+                IWorkbenchPage page = window.getActivePage();
+                if (page == null) return;
+                for (org.eclipse.ui.IEditorReference ref : page.getEditorReferences()) {
+                    if (ref == null) continue;
+                    String n = ref.getName();
+                    if (n == null) continue;
+                    int dot = n.lastIndexOf('.');
+                    String stem = (dot > 0 ? n.substring(0, dot) : n).toUpperCase(Locale.ROOT);
+                    if (stem.equals(target)) { found[0] = true; return; }
+                }
+            } catch (Throwable ignored) {}
+        });
+        return found[0];
+    }
+
+    /**
+     * Closes the open editor whose name stem matches the given candidate
+     * name. No-op if no matching editor is found. Pass false for save so
+     * we never prompt the user (we never modified the file).
+     */
+    private void closeJustOpenedEditor(IWorkbenchWindow window, String candidateName) {
+        if (window == null || candidateName == null) return;
+        final String target = candidateName.toUpperCase(Locale.ROOT);
+        Display.getDefault().syncExec(() -> {
+            try {
+                IWorkbenchPage page = window.getActivePage();
+                if (page == null) return;
+                for (org.eclipse.ui.IEditorReference ref : page.getEditorReferences()) {
+                    if (ref == null) continue;
+                    String n = ref.getName();
+                    if (n == null) continue;
+                    int dot = n.lastIndexOf('.');
+                    String stem = (dot > 0 ? n.substring(0, dot) : n).toUpperCase(Locale.ROOT);
+                    if (stem.equals(target)) {
+                        IEditorPart ed = ref.getEditor(false);
+                        if (ed != null) page.closeEditor(ed, false);
+                        return;
+                    }
+                }
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    /**
+     * Counts how many candidate names appear as open editor titles in the
+     * workbench. Editor name typically has the form "NAME.ext" - we match by
+     * the stem (uppercase) against candidate.name.
+     */
+    private int countOpenEditorsMatching(IWorkbenchWindow window,
+                                         List<Candidate> candidates) {
+        if (window == null || candidates == null || candidates.isEmpty()) return 0;
+        final Set<String> wanted = new HashSet<>();
+        for (Candidate c : candidates) {
+            if (c.name != null) wanted.add(c.name.toUpperCase(Locale.ROOT));
+        }
+        final int[] count = { 0 };
+        Display.getDefault().syncExec(() -> {
+            try {
+                IWorkbenchPage page = window.getActivePage();
+                if (page == null) return;
+                for (org.eclipse.ui.IEditorReference ref : page.getEditorReferences()) {
+                    if (ref == null) continue;
+                    String n = ref.getName();
+                    if (n == null) continue;
+                    int dot = n.lastIndexOf('.');
+                    String stem = (dot > 0 ? n.substring(0, dot) : n).toUpperCase(Locale.ROOT);
+                    if (wanted.contains(stem)) count[0]++;
+                }
+            } catch (Throwable ignored) {}
+        });
+        return count[0];
     }
 
     private void checkCancel(IProgressMonitor monitor) {
