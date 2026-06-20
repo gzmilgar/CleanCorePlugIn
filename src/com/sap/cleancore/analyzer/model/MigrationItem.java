@@ -17,6 +17,8 @@ public class MigrationItem {
     private double estimatedMD;     // man-days
     private String risk;            // LOW / MEDIUM / HIGH
     private String reasoning;       // human-readable explanation
+    private Disposition disposition = Disposition.UNDECIDED; // SAP decision tree: RETIRE/RETAIN/ADAPT/RENOVATE
+    private long usageCount = -1;   // ABAP Call Monitor (SCMON/SUSG) usage; -1 = unknown, 0 = unused (retire candidate)
 
     public MigrationItem() {}
 
@@ -48,6 +50,14 @@ public class MigrationItem {
 
     public String getReasoning() { return reasoning; }
     public void setReasoning(String reasoning) { this.reasoning = reasoning; }
+
+    public Disposition getDisposition() { return disposition; }
+    public void setDisposition(Disposition disposition) {
+        this.disposition = (disposition != null ? disposition : Disposition.UNDECIDED);
+    }
+
+    public long getUsageCount() { return usageCount; }
+    public void setUsageCount(long usageCount) { this.usageCount = usageCount; }
 
     /** Count findings of a given severity. */
     public int countSeverity(Finding.Severity sev) {

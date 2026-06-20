@@ -7,7 +7,7 @@ package com.sap.cleancore.analyzer.model;
 public class Finding {
 
     public enum Severity { INFO, WARNING, ERROR }
-    public enum Source { ATC, STATIC, READINESS_CHECK, OBSOLETE_API, MODIFICATION }
+    public enum Source { ATC, STATIC, READINESS_CHECK, OBSOLETE_API, MODIFICATION, INVENTORY, INTEGRATION }
 
     private String checkId;
     private String message;
@@ -23,6 +23,8 @@ public class Finding {
     private String matchedCode;     // the literal code fragment the rule matched
     private String cleanCoreApi;    // optional modern API hint (e.g. CDS view name)
     private String objectName;      // the Z/Y object this finding belongs to (populated by bulk-analysis handlers)
+    private String sapNote;         // optional SAP Note reference (Simplification Database traceability)
+    private String simplificationItem; // optional Simplification Item ID
 
     public Finding() {}
 
@@ -65,6 +67,12 @@ public class Finding {
 
     public String getObjectName() { return objectName; }
     public void setObjectName(String objectName) { this.objectName = objectName; }
+
+    public String getSapNote() { return sapNote; }
+    public void setSapNote(String sapNote) { this.sapNote = sapNote; }
+
+    public String getSimplificationItem() { return simplificationItem; }
+    public void setSimplificationItem(String simplificationItem) { this.simplificationItem = simplificationItem; }
 
     @Override
     public String toString() {

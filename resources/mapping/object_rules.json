@@ -12,7 +12,12 @@
     "Z_CDS_VIEW":        { "S": 0.5, "M": 1,   "L": 2,  "XL": 4  },
     "Z_BADI_IMPL":       { "S": 1,   "M": 2,   "L": 4,  "XL": 8  },
     "Z_ENHANCEMENT":     { "S": 1,   "M": 2,   "L": 5,  "XL": 10 },
+    "Z_ENHANCEMENT_SPOT":{ "S": 1,   "M": 2,   "L": 4,  "XL": 8  },
     "Z_INCLUDE":         { "S": 0.5, "M": 1,   "L": 2,  "XL": 4  },
+    "Z_APPEND_STRUCTURE":{ "S": 0.5, "M": 1,   "L": 2,  "XL": 4  },
+    "CUSTOM_FIELD":      { "S": 0.25,"M": 0.5, "L": 1,  "XL": 2  },
+    "STANDARD_MODIFICATION": { "S": 2, "M": 4, "L": 8,  "XL": 16 },
+    "USER_EXIT":         { "S": 1,   "M": 2,   "L": 4,  "XL": 8  },
     "MODIFICATION":      { "S": 2,   "M": 4,   "L": 8,  "XL": 16 },
     "UNKNOWN":           { "S": 0.5, "M": 1,   "L": 2,  "XL": 4  }
   },
