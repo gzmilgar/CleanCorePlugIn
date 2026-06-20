@@ -7,13 +7,16 @@ import com.sap.cleancore.analyzer.analyzers.StaticAbapAnalyzer;
 import com.sap.cleancore.analyzer.data.AdtConnectionService;
 import com.sap.cleancore.analyzer.data.CapabilityDetector;
 import com.sap.cleancore.analyzer.effort.EffortEstimator;
+import com.sap.cleancore.analyzer.effort.EffortRules;
 import com.sap.cleancore.analyzer.mapping.MappingRepository;
 import com.sap.cleancore.analyzer.model.AnalysisFilter;
 import com.sap.cleancore.analyzer.model.AnalysisRun;
 import com.sap.cleancore.analyzer.model.Finding;
 import com.sap.cleancore.analyzer.model.MigrationItem;
 import com.sap.cleancore.analyzer.model.SystemCapabilities;
+import com.sap.cleancore.analyzer.model.TransformationScenario;
 import com.sap.cleancore.analyzer.model.ZObject;
+import com.sap.cleancore.analyzer.scenario.ScenarioRegistry;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
@@ -51,15 +54,26 @@ public class AnalysisService {
     private final ComplexityCalculator complexityCalc = new ComplexityCalculator();
     private final EffortEstimator estimator = new EffortEstimator();
 
-    /** New entry point with filter + cancellation. */
+    /**
+     * Backwards-compatible entry point — uses the default transformation
+     * scenario, preserving today's behaviour for existing callers.
+     */
     public AnalysisRun run(AnalysisFilter filter, String atcVariant,
+                           ProgressListener listener, IProgressMonitor monitor) throws Exception {
+        return run(filter, ScenarioRegistry.getInstance().getDefault(), atcVariant, listener, monitor);
+    }
+
+    /** New entry point with filter + transformation scenario + cancellation. */
+    public AnalysisRun run(AnalysisFilter filter, TransformationScenario scenario, String atcVariant,
                            ProgressListener listener, IProgressMonitor monitor) throws Exception {
         if (monitor == null) monitor = new NullProgressMonitor();
         if (filter == null) filter = AnalysisFilter.fullScan();
+        scenario = applyScenario(scenario);
 
         AnalysisRun run = new AnalysisRun();
         run.setStartedAt(LocalDateTime.now().toString());
         run.setSystemDisplay(AdtConnectionService.getInstance().getDisplayName());
+        run.setScenario(scenario);
         run.setPackageFilter(filter.getPackagePrefixes());
 
         // 1) Capabilities (best-effort — used only to decide ATC + display.
@@ -193,12 +207,20 @@ public class AnalysisService {
      */
     public AnalysisRun runOnObjects(List<ZObject> objects, String runLabel,
                                     IProgressMonitor monitor) throws Exception {
+        return runOnObjects(objects, runLabel, ScenarioRegistry.getInstance().getDefault(), monitor);
+    }
+
+    /** Scenario-aware variant of {@link #runOnObjects(List, String, IProgressMonitor)}. */
+    public AnalysisRun runOnObjects(List<ZObject> objects, String runLabel,
+                                    TransformationScenario scenario, IProgressMonitor monitor) throws Exception {
         if (monitor == null) monitor = new NullProgressMonitor();
         if (objects == null) objects = new java.util.ArrayList<>();
+        scenario = applyScenario(scenario);
 
         AnalysisRun run = new AnalysisRun();
         run.setStartedAt(LocalDateTime.now().toString());
         run.setSystemDisplay(AdtConnectionService.getInstance().getDisplayName());
+        run.setScenario(scenario);
         if (runLabel != null) {
             java.util.List<String> labels = new java.util.ArrayList<>();
             labels.add(runLabel);
@@ -323,6 +345,17 @@ public class AnalysisService {
             f.setPackagePrefixes(packageFilter);
         }
         return run(f, atcVariant, listener, new NullProgressMonitor());
+    }
+
+    /**
+     * Resolves the scenario (default when null) and activates its effort
+     * profile so per-object effort estimation reflects the scenario. Keeps the
+     * {@code coefficientsFor}/{@code thresholds} signatures untouched.
+     */
+    private TransformationScenario applyScenario(TransformationScenario scenario) {
+        if (scenario == null) scenario = ScenarioRegistry.getInstance().getDefault();
+        EffortRules.getInstance().setActiveProfile(scenario.getEffortProfileId());
+        return scenario;
     }
 
     private void checkCancel(IProgressMonitor monitor) {

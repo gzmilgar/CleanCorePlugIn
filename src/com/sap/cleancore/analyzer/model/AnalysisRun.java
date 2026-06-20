@@ -13,6 +13,7 @@ public class AnalysisRun {
     private String startedAt;
     private String finishedAt;
     private SystemCapabilities capabilities;
+    private TransformationScenario scenario;   // transformation scenario used for this run
     private List<MigrationItem> items = new ArrayList<>();
     private List<String> packageFilter = new ArrayList<>();
     private double totalMD;
@@ -29,6 +30,9 @@ public class AnalysisRun {
 
     public SystemCapabilities getCapabilities() { return capabilities; }
     public void setCapabilities(SystemCapabilities capabilities) { this.capabilities = capabilities; }
+
+    public TransformationScenario getScenario() { return scenario; }
+    public void setScenario(TransformationScenario scenario) { this.scenario = scenario; }
 
     public List<MigrationItem> getItems() { return items; }
     public void setItems(List<MigrationItem> items) { this.items = items; }

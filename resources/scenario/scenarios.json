@@ -1,0 +1,46 @@
+{
+  "_comment": "Transformation scenarios for the SAP Transformation Assessment tool. Each scenario binds a source release + target platform to a rule-pack selection, an effort profile (see object_rules.json profiles), enabled integration-inventory collectors and feature flags. Loaded by ScenarioRegistry; on read failure the built-in defaults are used.",
+  "defaultScenarioId": "ecc_to_s4_onprem",
+  "scenarios": [
+    {
+      "id": "ecc_to_s4_onprem",
+      "displayName": "ECC 6.x → S/4HANA (on-premise)",
+      "sourceRelease": "ECC6",
+      "targetPlatform": "S4_ONPREM",
+      "effortProfileId": "s4_onprem",
+      "rulePackIds": ["core_static", "clean_core", "data_model_simplification"],
+      "enabledInventoryCollectors": ["RFC", "IDOC", "SICF", "WEBSERVICE"],
+      "flags": { "dataModelSimplification": true, "cloudReadiness": false, "unicodeConversion": false }
+    },
+    {
+      "id": "ecc_to_rise_s4hc_private",
+      "displayName": "ECC/ERP → RISE (S/4HANA Cloud Private Edition)",
+      "sourceRelease": "ERP_EHP8",
+      "targetPlatform": "S4HC_PRIVATE",
+      "effortProfileId": "s4hc_private",
+      "rulePackIds": ["core_static", "clean_core", "data_model_simplification"],
+      "enabledInventoryCollectors": ["RFC", "IDOC", "SICF", "WEBSERVICE", "PIPO", "BTP"],
+      "flags": { "dataModelSimplification": true, "cloudReadiness": true, "unicodeConversion": false }
+    },
+    {
+      "id": "r3_to_rise",
+      "displayName": "R/3 4.7 → RISE (S/4HANA Cloud Private Edition)",
+      "sourceRelease": "R3_47",
+      "targetPlatform": "RISE_PRIVATE",
+      "effortProfileId": "r3_rise",
+      "rulePackIds": ["core_static", "clean_core", "data_model_simplification"],
+      "enabledInventoryCollectors": ["RFC", "IDOC", "SICF", "WEBSERVICE", "PIPO", "BTP"],
+      "flags": { "dataModelSimplification": true, "cloudReadiness": true, "unicodeConversion": true }
+    },
+    {
+      "id": "default",
+      "displayName": "Generic Clean Core readiness (custom code only)",
+      "sourceRelease": "S4_ANY",
+      "targetPlatform": "S4_ONPREM",
+      "effortProfileId": "default",
+      "rulePackIds": [],
+      "enabledInventoryCollectors": [],
+      "flags": { "dataModelSimplification": false, "cloudReadiness": false, "unicodeConversion": false }
+    }
+  ]
+}

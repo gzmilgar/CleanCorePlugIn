@@ -293,6 +293,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
         if (dlg.open() != org.eclipse.jface.window.Window.OK) return;
         final AnalysisFilter filter = dlg.getResult();
         if (filter == null) return;
+        final com.sap.cleancore.analyzer.model.TransformationScenario scenario = dlg.getScenario();
 
         progressBar.setMinimum(0);
         progressBar.setMaximum(100);
@@ -305,7 +306,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
             @Override
             protected IStatus run(IProgressMonitor monitor) {
                 try {
-                    AnalysisRun run = service.run(filter, variant,
+                    AnalysisRun run = service.run(filter, scenario, variant,
                             (done, total, msg) -> {
                                 // Update view progress bar on UI thread (async to avoid blocking the job)
                                 if (PlatformUI.getWorkbench() != null

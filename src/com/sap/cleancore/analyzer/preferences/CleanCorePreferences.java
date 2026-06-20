@@ -15,6 +15,7 @@ public class CleanCorePreferences {
     public static final String LOC_M             = "ccAnalyzer.locM";
     public static final String LOC_L             = "ccAnalyzer.locL";
     public static final String ALLOW_SELF_SIGNED = "ccAnalyzer.allowSelfSigned";
+    public static final String SCENARIO_ID       = "ccAnalyzer.scenarioId";
 
     public static final String DEFAULT_ATC_VARIANT = "S4HANA_READINESS_REMOTE";
     public static final String DEFAULT_API_HUB_URL = "https://api.sap.com/odata/1.0/catalog.svc/APIs";
@@ -51,5 +52,15 @@ public class CleanCorePreferences {
 
     public static void setAllowSelfSignedCerts(boolean b) {
         store().setValue(ALLOW_SELF_SIGNED, b);
+    }
+
+    /** Last-used / default transformation scenario id (empty = registry default). */
+    public static String getScenarioId() {
+        String v = store().getString(SCENARIO_ID);
+        return (v == null) ? "" : v;
+    }
+
+    public static void setScenarioId(String v) {
+        store().setValue(SCENARIO_ID, v != null ? v : "");
     }
 }

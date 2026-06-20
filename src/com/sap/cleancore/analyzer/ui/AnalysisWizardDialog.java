@@ -1,6 +1,9 @@
 package com.sap.cleancore.analyzer.ui;
 
 import com.sap.cleancore.analyzer.model.AnalysisFilter;
+import com.sap.cleancore.analyzer.model.TransformationScenario;
+import com.sap.cleancore.analyzer.preferences.CleanCorePreferences;
+import com.sap.cleancore.analyzer.scenario.ScenarioRegistry;
 
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.swt.SWT;
@@ -52,8 +55,11 @@ public class AnalysisWizardDialog extends Dialog {
     private Map<String, Button> typeChecks = new LinkedHashMap<>();
     private Button includeYBtn;
     private Text maxResultsText;
+    private Combo scenarioCombo;
+    private java.util.List<TransformationScenario> scenarioList = new java.util.ArrayList<>();
 
     private AnalysisFilter result;
+    private TransformationScenario scenarioResult;
 
     public AnalysisWizardDialog(Shell parent) { super(parent); }
 
@@ -68,6 +74,33 @@ public class AnalysisWizardDialog extends Dialog {
         Composite root = (Composite) super.createDialogArea(parent);
         root.setLayout(new GridLayout(1, false));
         ((GridData) root.getLayoutData()).widthHint = 520;
+
+        // --- Transformation scenario group ---
+        Group scenarioGrp = new Group(root, SWT.NONE);
+        scenarioGrp.setText("Transformation scenario");
+        scenarioGrp.setLayout(new GridLayout(2, false));
+        scenarioGrp.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        new Label(scenarioGrp, SWT.NONE).setText("Source → Target:");
+        scenarioCombo = new Combo(scenarioGrp, SWT.READ_ONLY);
+        scenarioCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        scenarioCombo.setToolTipText(
+                "Selects the old→new transformation (e.g. ECC→S/4HANA on-prem,\n"
+              + "ECC→RISE/S4HC, R/3→RISE). Drives the effort profile, rule packs,\n"
+              + "integration collectors and optional analyzers.");
+        scenarioList = ScenarioRegistry.getInstance().getAll();
+        String preselId = CleanCorePreferences.getScenarioId();
+        if (preselId == null || preselId.isEmpty()) {
+            TransformationScenario def = ScenarioRegistry.getInstance().getDefault();
+            preselId = (def != null ? def.getId() : null);
+        }
+        int sel = 0;
+        for (int i = 0; i < scenarioList.size(); i++) {
+            TransformationScenario s = scenarioList.get(i);
+            scenarioCombo.add(s.getDisplayName() != null ? s.getDisplayName() : s.getId());
+            if (preselId != null && preselId.equalsIgnoreCase(s.getId())) sel = i;
+        }
+        if (scenarioCombo.getItemCount() > 0) scenarioCombo.select(sel);
 
         // --- Mode group ---
         Group modeGrp = new Group(root, SWT.NONE);
@@ -216,9 +249,24 @@ public class AnalysisWizardDialog extends Dialog {
         catch (Exception ignored) {}
         f.setMaxResults(max);
 
+        // Resolve the chosen transformation scenario and persist it.
+        if (scenarioCombo != null) {
+            int idx = scenarioCombo.getSelectionIndex();
+            if (idx >= 0 && idx < scenarioList.size()) {
+                scenarioResult = scenarioList.get(idx);
+                CleanCorePreferences.setScenarioId(scenarioResult.getId());
+            }
+        }
+        if (scenarioResult == null) {
+            scenarioResult = ScenarioRegistry.getInstance().getDefault();
+        }
+
         this.result = f;
         super.okPressed();
     }
 
     public AnalysisFilter getResult() { return result; }
+
+    /** The transformation scenario chosen by the user (never null after OK). */
+    public TransformationScenario getScenario() { return scenarioResult; }
 }
