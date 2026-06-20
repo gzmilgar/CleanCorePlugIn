@@ -24,11 +24,42 @@ analyzer + SAP Cloudification Repository mapping ile çalışır.
 - **Background Job**: UI donmaz, Cancel butonu Eclipse Progress view'da.
 - **Mapping Maintenance UI**: Arama, manuel CRUD, "Sync from SAP
   Cloudification Repo" butonu — USER override'lar korunur.
-- **Export**: CSV / JSON.
+- **Export**: CSV / JSON (+ disposition & scenario alanları) ve **Project
+  Report** (HTML + özet CSV, aşağıya bkz.).
 - **Effort Estimation**: S/M/L/XL kategori bazlı MD tahmini (preferences'tan
   katsayılar değiştirilebilir).
 - **Static analyzer fallback**: ATC yoksa bundled kurallar (SELECT *, NATIVE
   SQL, CALL SCREEN vs.)
+
+## SAP Transformation Assessment (yeni)
+
+Araç, tekil Z*/Y* clean-core taramasının ötesinde **eski sistem → yeni sistem**
+dönüşümlerini (ECC→S/4HANA on-prem, ECC/ERP→RISE/S4HC, R/3→RISE) proje
+seviyesinde değerlendirir. SAP'nin resmi *"Custom Code Adaptation to SAP
+S/4HANA and ABAP Cloud"* metodolojisiyle hizalıdır.
+
+- **Transformation Scenario**: Run Analysis wizard'ında kaynak→hedef senaryosu
+  seçilir. Her senaryo kendi **efor profilini** (man-day katsayı çarpanı), rule
+  pack'lerini ve özelliklerini (cloud readiness, data model simplification,
+  unicode) taşır. Senaryolar `resources/scenario/scenarios.json`'dan yüklenir;
+  dosya okunamazsa built-in default'a düşülür.
+- **Disposition karar ağacı** (SAP kanonik sınıflandırması): her obje **RETIRE**
+  (kullanılmıyor → kaldır), **RETAIN** (standart S/4 karşılıyor), **ADAPT**
+  (S/4HANA için uyarla) veya **RENOVATE** (ABAP Cloud / RAP / released API'ye
+  modernize) olarak etiketlenir.
+- **Kullanım verisi ile scoping**: ABAP Call Monitor (SCMON/SUSG) kullanım
+  sayısı 0 olan objeler otomatik **RETIRE** (efor ≈ 0) → kapsam daralır.
+- **Profil bazlı efor**: aynı obje seti farklı senaryolarda farklı man-day
+  verir (ör. R/3→RISE en yüksek çarpan). `EffortRules` profilleri
+  `object_rules.json` `profiles` bloğunda.
+- **Project Report** (*Export Project Report* butonu): presales-dostu,
+  bağımlılıksız **HTML** rapor + özet **CSV**. İçerik: toplam man-day (+
+  contingency), kategori kırılımı (custom code / modifications / DDIC /
+  integration), disposition kırılımı, **dalga/faz planı** (Wave0 decommission →
+  Wave3 renovate), efor boyut karışımı ve rol kırılımı (developer / functional /
+  basis). Ayarlar `object_rules.json` `report` bloğundan.
+- **Geriye uyumluluk**: "Generic Clean Core readiness" (default) senaryosu
+  bugünkü davranışı birebir korur (disposition UNDECIDED, MD değişmez).
 
 ## Kurulum (geliştirme için)
 
@@ -112,8 +143,10 @@ com.sap.cleancore/
 │   ├── mapping/
 │   │   ├── fm_mapping.json
 │   │   ├── bapi_mapping.json
-│   │   ├── object_rules.json
+│   │   ├── object_rules.json   (effort rules + profiles + report config)
 │   │   └── atc_variants.json
+│   ├── scenario/
+│   │   └── scenarios.json      (transformation scenarios)
 │   ├── data/
 │   └── icons/
 └── src/com/sap/cleancore/
@@ -125,14 +158,18 @@ com.sap.cleancore/
         │                 WorkspaceAdtCollector, AdtResourceSourceFetcher, ...
         ├── data/         AdtConnectionService, CapabilityDetector,
         │                 ReleaseObject, SapReleaseDataService
-        ├── effort/       EffortEstimator, EffortRules
+        ├── effort/       EffortEstimator, EffortRules (profile-aware)
+        ├── scenario/     ScenarioRegistry
+        ├── report/       ProjectEstimate, ProjectEstimateBuilder,
+        │                 ProjectReportExporter
         ├── handlers/     AnalyzeCurrentFileHandler,
         │                 AnalyzeAllOpenEditorsHandler,
         │                 AnalyzeSelectedPackageHandler
         ├── mapping/      MappingRepository, SapApiHubClient,
         │                 SapCloudificationBridge
         ├── model/        ZObject, AnalysisRun, MigrationItem,
-        │                 MappingEntry, AnalysisFilter, Finding, ...
+        │                 MappingEntry, AnalysisFilter, Finding,
+        │                 TransformationScenario, Disposition, ...
         ├── preferences/  CleanCorePreferencePage
         ├── ui/           CleanCoreAnalyzerView, MappingMaintenanceView,
         │                 ConnectionDialog, AnalysisWizardDialog
