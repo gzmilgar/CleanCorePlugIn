@@ -32,5 +32,10 @@
     "s4_onprem":    { "effortMultiplier": 1.0 },
     "s4hc_private": { "effortMultiplier": 1.25 },
     "r3_rise":      { "effortMultiplier": 1.5 }
+  },
+  "report": {
+    "_comment": "Project-level report settings consumed by ProjectEstimateBuilder. contingencyPct is added on top of summed MD; roleSplit ratios should sum to ~1.0 and split total MD across roles.",
+    "contingencyPct": 15,
+    "roleSplit": { "developer": 0.7, "functional": 0.2, "basis": 0.1 }
   }
 }

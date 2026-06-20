@@ -3,6 +3,9 @@ package com.sap.cleancore.analyzer.utils;
 import com.sap.cleancore.analyzer.model.AnalysisRun;
 import com.sap.cleancore.analyzer.model.MappingEntry;
 import com.sap.cleancore.analyzer.model.MigrationItem;
+import com.sap.cleancore.analyzer.report.ProjectEstimate;
+import com.sap.cleancore.analyzer.report.ProjectEstimateBuilder;
+import com.sap.cleancore.analyzer.report.ProjectReportExporter;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -104,6 +107,20 @@ public class ExportUtil {
                 new FileOutputStream(target), StandardCharsets.UTF_8))) {
             w.write(JsonWriter.write(root));
         }
+    }
+
+    /**
+     * Builds the project-level estimate from the run and writes a presales HTML
+     * report. A summary CSV is written next to it (same name, .csv).
+     */
+    public static void exportProjectReportHtml(AnalysisRun run, File target) throws Exception {
+        ProjectEstimate est = new ProjectEstimateBuilder().build(run);
+        ProjectReportExporter exp = new ProjectReportExporter();
+        exp.exportHtml(est, target);
+        String path = target.getAbsolutePath();
+        int dot = path.lastIndexOf('.');
+        File csv = new File(dot > 0 ? path.substring(0, dot) + ".csv" : path + ".csv");
+        try { exp.exportSummaryCsv(est, csv); } catch (Exception ignored) { /* best-effort companion */ }
     }
 
     private static String safe(String s) {

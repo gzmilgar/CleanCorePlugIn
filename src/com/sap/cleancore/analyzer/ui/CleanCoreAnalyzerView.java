@@ -91,6 +91,12 @@ public class CleanCoreAnalyzerView extends ViewPart {
         exportJson.setText("Export JSON");
         exportJson.addListener(SWT.Selection, e -> onExport(true));
 
+        Button exportReport = new Button(toolbar, SWT.PUSH);
+        exportReport.setText("Export Project Report");
+        exportReport.setToolTipText("Generate a presales HTML project report (total MD, "
+                + "disposition & wave plan) + summary CSV.");
+        exportReport.addListener(SWT.Selection, e -> onExportProjectReport());
+
         Button mappingsBtn = new Button(toolbar, SWT.PUSH);
         mappingsBtn.setText("Mapping Maintenance");
         mappingsBtn.addListener(SWT.Selection, e -> openMaintenance());
@@ -357,6 +363,24 @@ public class CleanCoreAnalyzerView extends ViewPart {
             if (json) ExportUtil.exportJson(currentRun, new File(path));
             else      ExportUtil.exportCsv(currentRun, new File(path));
             MessageDialog.openInformation(getSite().getShell(), "Clean Core", "Exported to " + path);
+        } catch (Exception ex) {
+            MessageDialog.openError(getSite().getShell(), "Export failed", ex.getMessage());
+        }
+    }
+
+    private void onExportProjectReport() {
+        if (currentRun == null) {
+            MessageDialog.openWarning(getSite().getShell(), "Clean Core", "No analysis run to export.");
+            return;
+        }
+        FileDialog fd = new FileDialog(getSite().getShell(), SWT.SAVE);
+        fd.setFileName("transformation_assessment.html");
+        String path = fd.open();
+        if (path == null) return;
+        try {
+            ExportUtil.exportProjectReportHtml(currentRun, new File(path));
+            MessageDialog.openInformation(getSite().getShell(), "Clean Core",
+                    "Project report exported to " + path + " (summary CSV alongside).");
         } catch (Exception ex) {
             MessageDialog.openError(getSite().getShell(), "Export failed", ex.getMessage());
         }
