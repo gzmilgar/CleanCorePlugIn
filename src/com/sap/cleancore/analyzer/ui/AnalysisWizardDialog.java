@@ -15,10 +15,13 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
+
+import java.io.File;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,10 +59,12 @@ public class AnalysisWizardDialog extends Dialog {
     private Button includeYBtn;
     private Text maxResultsText;
     private Combo scenarioCombo;
+    private Text extractText;
     private java.util.List<TransformationScenario> scenarioList = new java.util.ArrayList<>();
 
     private AnalysisFilter result;
     private TransformationScenario scenarioResult;
+    private File integrationExtractFile;
 
     public AnalysisWizardDialog(Shell parent) { super(parent); }
 
@@ -101,6 +106,30 @@ public class AnalysisWizardDialog extends Dialog {
             if (preselId != null && preselId.equalsIgnoreCase(s.getId())) sel = i;
         }
         if (scenarioCombo.getItemCount() > 0) scenarioCombo.select(sel);
+
+        new Label(scenarioGrp, SWT.NONE).setText("Integration extract (optional):");
+        Composite extractRow = new Composite(scenarioGrp, SWT.NONE);
+        GridLayout erl = new GridLayout(2, false);
+        erl.marginWidth = 0; erl.marginHeight = 0;
+        extractRow.setLayout(erl);
+        extractRow.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        extractText = new Text(extractRow, SWT.BORDER);
+        extractText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        extractText.setMessage("Z_TRANSFORM_INVENTORY JSON (SM59/WE20/SICF/...)");
+        extractText.setToolTipText(
+                "Optional JSON produced by the Z_TRANSFORM_INVENTORY ABAP report "
+              + "(see resources/extract). Feeds the integration inventory + "
+              + "project report. Leave empty to skip integration scope.");
+        Button browse = new Button(extractRow, SWT.PUSH);
+        browse.setText("Browse...");
+        browse.addSelectionListener(new SelectionAdapter() {
+            @Override public void widgetSelected(SelectionEvent e) {
+                FileDialog fd = new FileDialog(getShell(), SWT.OPEN);
+                fd.setFilterExtensions(new String[]{"*.json", "*.*"});
+                String p = fd.open();
+                if (p != null) extractText.setText(p);
+            }
+        });
 
         // --- Mode group ---
         Group modeGrp = new Group(root, SWT.NONE);
@@ -261,6 +290,14 @@ public class AnalysisWizardDialog extends Dialog {
             scenarioResult = ScenarioRegistry.getInstance().getDefault();
         }
 
+        if (extractText != null) {
+            String p = extractText.getText() != null ? extractText.getText().trim() : "";
+            if (!p.isEmpty()) {
+                File ef = new File(p);
+                if (ef.isFile()) integrationExtractFile = ef;
+            }
+        }
+
         this.result = f;
         super.okPressed();
     }
@@ -269,4 +306,7 @@ public class AnalysisWizardDialog extends Dialog {
 
     /** The transformation scenario chosen by the user (never null after OK). */
     public TransformationScenario getScenario() { return scenarioResult; }
+
+    /** Optional integration extract file the user picked (null if none). */
+    public File getIntegrationExtractFile() { return integrationExtractFile; }
 }

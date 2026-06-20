@@ -1,0 +1,43 @@
+{
+  "_comment": "Contract between the Z_TRANSFORM_INVENTORY ABAP report and ExtractIngestor. Run the report in the source system, download the JSON, then import it via 'Import integration extract...'. Only 'items' is required; each item needs at least 'category' and 'name'. category ∈ {RFC_DESTINATION, IDOC_PARTNER, SICF_SERVICE, ODATA_SERVICE, WEB_SERVICE, PI_PO_INTERFACE, BTP_INTEGRATION}. usageCount=0 marks an unused item (retire, ~0 MD).",
+  "extractVersion": "1.0",
+  "system": "ECC_100",
+  "items": [
+    {
+      "category": "RFC_DESTINATION",
+      "name": "SAPECC_PRD",
+      "target": "prd-host.example.com",
+      "protocol": "RFC",
+      "direction": "OUTBOUND",
+      "usageCount": 1240,
+      "migrationNote": "Re-point to new S/4 host after cutover.",
+      "attributes": { "rfctype": "3", "trusted": "X" }
+    },
+    {
+      "category": "IDOC_PARTNER",
+      "name": "ORDERS05/LS/CRM_PROD",
+      "target": "CRM_PROD",
+      "protocol": "IDoc",
+      "direction": "OUTBOUND",
+      "usageCount": 53000,
+      "migrationNote": "Verify partner profile + port on target."
+    },
+    {
+      "category": "ODATA_SERVICE",
+      "name": "ZSALES_SRV",
+      "protocol": "HTTP",
+      "direction": "INBOUND",
+      "usageCount": 0,
+      "migrationNote": "No calls in usage window — decommission candidate."
+    },
+    {
+      "category": "PI_PO_INTERFACE",
+      "name": "SI_Invoice_Out",
+      "target": "PI_PROD",
+      "protocol": "SOAP",
+      "direction": "OUTBOUND",
+      "usageCount": 920,
+      "migrationNote": "Migrate to SAP Integration Suite (Cloud Integration)."
+    }
+  ]
+}

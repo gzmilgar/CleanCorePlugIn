@@ -37,5 +37,16 @@
     "_comment": "Project-level report settings consumed by ProjectEstimateBuilder. contingencyPct is added on top of summed MD; roleSplit ratios should sum to ~1.0 and split total MD across roles.",
     "contingencyPct": 15,
     "roleSplit": { "developer": 0.7, "functional": 0.2, "basis": 0.1 }
+  },
+  "integration": {
+    "_comment": "Per integration-inventory category default effort (category + man-days). Consumed by InventoryEffortEstimator; the active scenario effort multiplier is applied on top. usageCount=0 items are treated as retire (≈0 MD).",
+    "RFC_DESTINATION": { "category": "S", "md": 0.5 },
+    "IDOC_PARTNER":    { "category": "M", "md": 1.0 },
+    "SICF_SERVICE":    { "category": "S", "md": 0.5 },
+    "ODATA_SERVICE":   { "category": "M", "md": 1.5 },
+    "WEB_SERVICE":     { "category": "M", "md": 2.0 },
+    "PI_PO_INTERFACE": { "category": "L", "md": 5.0 },
+    "BTP_INTEGRATION": { "category": "L", "md": 4.0 },
+    "UNKNOWN":         { "category": "M", "md": 1.0 }
   }
 }

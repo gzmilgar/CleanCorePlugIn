@@ -5,6 +5,7 @@ import com.sap.cleancore.analyzer.analyzers.DispositionClassifier;
 import com.sap.cleancore.analyzer.analyzers.ModificationDetector;
 import com.sap.cleancore.analyzer.analyzers.ObsoleteApiDetector;
 import com.sap.cleancore.analyzer.analyzers.StaticAbapAnalyzer;
+import com.sap.cleancore.analyzer.collectors.inventory.IntegrationInventoryService;
 import com.sap.cleancore.analyzer.data.AdtConnectionService;
 import com.sap.cleancore.analyzer.data.CapabilityDetector;
 import com.sap.cleancore.analyzer.effort.EffortEstimator;
@@ -55,6 +56,12 @@ public class AnalysisService {
     private final ComplexityCalculator complexityCalc = new ComplexityCalculator();
     private final EffortEstimator estimator = new EffortEstimator();
     private final DispositionClassifier dispositionClassifier = new DispositionClassifier();
+    private final IntegrationInventoryService inventoryService = new IntegrationInventoryService();
+
+    /** Optional Z_TRANSFORM_INVENTORY JSON extract for integration inventory. */
+    private java.io.File integrationExtractFile;
+
+    public void setIntegrationExtractFile(java.io.File f) { this.integrationExtractFile = f; }
 
     /**
      * Backwards-compatible entry point — uses the default transformation
@@ -194,6 +201,9 @@ public class AnalysisService {
 
         analyseObjects(objects, run, atcByName, usedWorkspace, httpReachable, listener, monitor);
 
+        // 5) Integration inventory (scenario-gated, extract-first, best-effort).
+        collectInventory(run, scenario);
+
         run.setFinishedAt(LocalDateTime.now().toString());
         run.recomputeTotals();
         monitor.done();
@@ -237,6 +247,8 @@ public class AnalysisService {
         // HTTP only kicks in when workspace returns null for that object.
         boolean httpReachable = AdtConnectionService.getInstance().getAdtProject() != null;
         analyseObjects(objects, run, null, true, httpReachable, null, monitor);
+
+        collectInventory(run, scenario);
 
         run.setFinishedAt(LocalDateTime.now().toString());
         run.recomputeTotals();
@@ -362,6 +374,15 @@ public class AnalysisService {
         if (scenario == null) scenario = ScenarioRegistry.getInstance().getDefault();
         EffortRules.getInstance().setActiveProfile(scenario.getEffortProfileId());
         return scenario;
+    }
+
+    /** Collects the integration inventory (best-effort, never aborts the run). */
+    private void collectInventory(AnalysisRun run, TransformationScenario scenario) {
+        try {
+            run.setInventory(inventoryService.collect(scenario, integrationExtractFile));
+        } catch (Exception e) {
+            // graceful degradation — inventory is optional
+        }
     }
 
     private void checkCancel(IProgressMonitor monitor) {

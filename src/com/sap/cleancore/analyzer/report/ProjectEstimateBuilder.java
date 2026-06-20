@@ -80,10 +80,24 @@ public class ProjectEstimateBuilder {
             w.itemCount++; w.md += md;
         }
 
-        est.getWaves().addAll(waveIndex.values());
-
-        // Inventory (Phase 3) — none yet; hook kept for forward compatibility.
+        // Integration inventory (Phase 3): adds to the 'integration' category
+        // and the wave plan (decommission when unused, else heavy/Wave3).
         double inventoryMD = 0;
+        if (run.getInventory() != null) {
+            for (com.sap.cleancore.analyzer.model.inventory.InventoryItem inv : run.getInventory()) {
+                if (inv == null) continue;
+                double md = inv.getEstimatedMD();
+                inventoryMD += md;
+                addD(est.getMdByCategory(), CAT_INTEGRATION, md);
+                addI(est.getCountByCategory(), CAT_INTEGRATION, 1);
+                if (inv.getEffortCategory() != null) addI(est.getCountBySize(), inv.getEffortCategory().name(), 1);
+                boolean retire = inv.getUsageCount() == 0;
+                ProjectEstimate.Wave w = waveById(retire ? "wave0" : "wave3");
+                w.itemCount++; w.md += md;
+            }
+        }
+
+        est.getWaves().addAll(waveIndex.values());
 
         est.setCodeMD(round(codeMD));
         est.setInventoryMD(round(inventoryMD));

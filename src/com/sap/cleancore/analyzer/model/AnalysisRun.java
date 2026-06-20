@@ -15,8 +15,10 @@ public class AnalysisRun {
     private SystemCapabilities capabilities;
     private TransformationScenario scenario;   // transformation scenario used for this run
     private List<MigrationItem> items = new ArrayList<>();
+    private List<com.sap.cleancore.analyzer.model.inventory.InventoryItem> inventory = new ArrayList<>();
     private List<String> packageFilter = new ArrayList<>();
-    private double totalMD;
+    private double totalMD;          // code MD only (backward-compatible meaning)
+    private double inventoryMD;      // integration inventory MD
     private int countS, countM, countL, countXL;
 
     public String getSystemDisplay() { return systemDisplay; }
@@ -38,16 +40,23 @@ public class AnalysisRun {
     public void setItems(List<MigrationItem> items) { this.items = items; }
     public void addItem(MigrationItem item) { this.items.add(item); }
 
+    public List<com.sap.cleancore.analyzer.model.inventory.InventoryItem> getInventory() { return inventory; }
+    public void setInventory(List<com.sap.cleancore.analyzer.model.inventory.InventoryItem> inventory) {
+        this.inventory = (inventory != null ? inventory : new ArrayList<>());
+    }
+
     public List<String> getPackageFilter() { return packageFilter; }
     public void setPackageFilter(List<String> packageFilter) { this.packageFilter = packageFilter; }
 
     public double getTotalMD() { return totalMD; }
+    public double getInventoryMD() { return inventoryMD; }
+    public double getGrandTotalMD() { return totalMD + inventoryMD; }
     public int getCountS() { return countS; }
     public int getCountM() { return countM; }
     public int getCountL() { return countL; }
     public int getCountXL() { return countXL; }
 
-    /** Aggregate totals from items list. Call after items are filled. */
+    /** Aggregate totals from items + inventory. Call after both are filled. */
     public void recomputeTotals() {
         totalMD = 0;
         countS = countM = countL = countXL = 0;
@@ -60,6 +69,10 @@ public class AnalysisRun {
                 case L:  countL++;  break;
                 case XL: countXL++; break;
             }
+        }
+        inventoryMD = 0;
+        for (com.sap.cleancore.analyzer.model.inventory.InventoryItem inv : inventory) {
+            inventoryMD += inv.getEstimatedMD();
         }
     }
 }

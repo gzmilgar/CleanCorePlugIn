@@ -42,6 +42,7 @@ public class EffortRules {
     private final EnumMap<ZObjectType, Coefficients> coefficients = new EnumMap<>(ZObjectType.class);
     private Thresholds thresholds = new Thresholds();
     private String activeProfile = "default";
+    private double activeMultiplier = 1.0;
     private boolean loaded;
 
     public static synchronized EffortRules getInstance() {
@@ -90,6 +91,7 @@ public class EffortRules {
             Map<String, Object> profTh = SimpleJsonParser.obj(profile, "categoryThresholds");
             if (!profTh.isEmpty()) applyThresholds(profTh);
             double mult = SimpleJsonParser.dbl(profile, "effortMultiplier", 1.0);
+            activeMultiplier = (mult > 0 ? mult : 1.0);
             if (mult != 1.0 && mult > 0) {
                 for (Coefficients c : coefficients.values()) {
                     c.s *= mult; c.m *= mult; c.l *= mult; c.xl *= mult;
@@ -100,6 +102,13 @@ public class EffortRules {
             defaults();
         }
         loaded = true;
+    }
+
+    /** The active profile's effort multiplier (already baked into coefficients;
+     *  exposed so inventory/integration effort can apply the same factor). */
+    public double activeMultiplier() {
+        loadIfNeeded();
+        return activeMultiplier;
     }
 
     @SuppressWarnings("unchecked")

@@ -68,6 +68,8 @@ public class ExportUtil {
         root.put("startedAt", run.getStartedAt());
         root.put("finishedAt", run.getFinishedAt());
         root.put("totalMD", run.getTotalMD());
+        root.put("inventoryMD", run.getInventoryMD());
+        root.put("grandTotalMD", run.getGrandTotalMD());
         root.put("countS", run.getCountS());
         root.put("countM", run.getCountM());
         root.put("countL", run.getCountL());
@@ -102,6 +104,25 @@ public class ExportUtil {
             arr.add(row);
         }
         root.put("items", arr);
+
+        java.util.List<Object> inv = new java.util.ArrayList<>();
+        if (run.getInventory() != null) {
+            for (com.sap.cleancore.analyzer.model.inventory.InventoryItem it : run.getInventory()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("category", it.getCategory() != null ? it.getCategory().name() : null);
+                row.put("name", it.getName());
+                row.put("target", it.getTarget());
+                row.put("protocol", it.getProtocol());
+                row.put("direction", it.getDirection());
+                if (it.getUsageCount() >= 0) row.put("usageCount", it.getUsageCount());
+                row.put("category_effort", it.getEffortCategory() != null ? it.getEffortCategory().name() : null);
+                row.put("estimatedMD", it.getEstimatedMD());
+                row.put("risk", it.getRisk());
+                row.put("migrationNote", it.getMigrationNote());
+                inv.add(row);
+            }
+        }
+        root.put("inventory", inv);
 
         try (BufferedWriter w = new BufferedWriter(new OutputStreamWriter(
                 new FileOutputStream(target), StandardCharsets.UTF_8))) {

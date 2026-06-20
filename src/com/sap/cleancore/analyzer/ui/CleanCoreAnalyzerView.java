@@ -300,6 +300,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
         final AnalysisFilter filter = dlg.getResult();
         if (filter == null) return;
         final com.sap.cleancore.analyzer.model.TransformationScenario scenario = dlg.getScenario();
+        final java.io.File extractFile = dlg.getIntegrationExtractFile();
 
         progressBar.setMinimum(0);
         progressBar.setMaximum(100);
@@ -307,6 +308,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
 
         final String variant = CleanCorePreferences.getAtcVariant();
         final AnalysisService service = new AnalysisService();
+        service.setIntegrationExtractFile(extractFile);
 
         Job job = new Job("Clean Core Analysis") {
             @Override

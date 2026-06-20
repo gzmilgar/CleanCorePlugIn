@@ -20,8 +20,11 @@ Bundle-ActivationPolicy: lazy
 Bundle-ClassPath: .
 Export-Package: com.sap.cleancore,
  com.sap.cleancore.analyzer.model,
+ com.sap.cleancore.analyzer.model.inventory,
  com.sap.cleancore.analyzer.mapping,
  com.sap.cleancore.analyzer.effort,
  com.sap.cleancore.analyzer.analyzers,
+ com.sap.cleancore.analyzer.scenario,
+ com.sap.cleancore.analyzer.report,
  com.sap.cleancore.analyzer.utils,
  com.sap.cleancore.analyzer.data

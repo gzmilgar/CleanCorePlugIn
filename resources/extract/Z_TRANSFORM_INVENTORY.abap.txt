@@ -1,0 +1,139 @@
+*&---------------------------------------------------------------------*
+*& Report  Z_TRANSFORM_INVENTORY
+*&---------------------------------------------------------------------*
+*& Integration / system inventory extractor for the SAP Transformation
+*& Assessment tool (Clean Core Analyzer plug-in).
+*&
+*& Purpose : SM59 RFC destinations, WE20 IDoc partner profiles, SICF /
+*&           OData services, web services, and (optionally) PI/PO + BTP
+*&           interfaces are Basis configuration that ADT REST does NOT
+*&           expose. This report reads the underlying config tables and
+*&           writes ONE JSON file matching resources/extract/extract_schema.json.
+*&
+*& Usage   : Run in the SOURCE system (ECC / R3 / S/4). It only READS
+*&           config tables — it changes nothing. Save / download the JSON
+*&           and import it in the plug-in via
+*&           "Import integration extract...".
+*&
+*& Note    : This is a TEMPLATE / starting point. Adjust selects and the
+*&           usage-data source (SCMON/SUSG, table SUSG or your own UPL
+*&           snapshot) to your release. The plug-in is forward-compatible:
+*&           unknown extra fields are ignored, missing optional fields are
+*&           tolerated. The plug-in does NOT install this report.
+*&---------------------------------------------------------------------*
+REPORT z_transform_inventory.
+
+PARAMETERS: p_file TYPE string LOWER CASE
+              DEFAULT 'transform_inventory.json'.
+
+TYPES: BEGIN OF ty_item,
+         category      TYPE string,
+         name          TYPE string,
+         target        TYPE string,
+         protocol      TYPE string,
+         direction     TYPE string,
+         usage_count   TYPE i,
+         migration     TYPE string,
+       END OF ty_item.
+DATA: gt_items TYPE STANDARD TABLE OF ty_item,
+      gs_item  TYPE ty_item.
+
+*&---------------------------------------------------------------------*
+*& 1) RFC destinations (SM59 / RFCDES)
+*&---------------------------------------------------------------------*
+DATA: lt_rfcdes TYPE STANDARD TABLE OF rfcdes,
+      ls_rfcdes TYPE rfcdes.
+SELECT * FROM rfcdes INTO TABLE lt_rfcdes.           "#EC CI_NOWHERE
+LOOP AT lt_rfcdes INTO ls_rfcdes.
+  CLEAR gs_item.
+  gs_item-category    = 'RFC_DESTINATION'.
+  gs_item-name        = ls_rfcdes-rfcdest.
+  gs_item-protocol    = ls_rfcdes-rfctype.
+  gs_item-direction   = 'OUTBOUND'.
+  gs_item-usage_count = -1.                          " fill from usage data if available
+  APPEND gs_item TO gt_items.
+ENDLOOP.
+
+*&---------------------------------------------------------------------*
+*& 2) IDoc partner profiles (WE20 / EDP13 outbound, EDP21 inbound)
+*&---------------------------------------------------------------------*
+DATA: lt_edp13 TYPE STANDARD TABLE OF edp13,
+      ls_edp13 TYPE edp13.
+SELECT * FROM edp13 INTO TABLE lt_edp13.             "#EC CI_NOWHERE
+LOOP AT lt_edp13 INTO ls_edp13.
+  CLEAR gs_item.
+  gs_item-category    = 'IDOC_PARTNER'.
+  CONCATENATE ls_edp13-mestyp '/' ls_edp13-rcvprn
+         INTO gs_item-name SEPARATED BY space.
+  gs_item-target      = ls_edp13-rcvprn.
+  gs_item-protocol    = 'IDoc'.
+  gs_item-direction   = 'OUTBOUND'.
+  gs_item-usage_count = -1.
+  APPEND gs_item TO gt_items.
+ENDLOOP.
+
+*&---------------------------------------------------------------------*
+*& 3) SICF services (ICFSERVICE) and OData (/IWFND/* — add per release)
+*&---------------------------------------------------------------------*
+DATA: lt_icf TYPE STANDARD TABLE OF icfservice,
+      ls_icf TYPE icfservice.
+SELECT * FROM icfservice INTO TABLE lt_icf.          "#EC CI_NOWHERE
+LOOP AT lt_icf INTO ls_icf.
+  CLEAR gs_item.
+  gs_item-category    = 'SICF_SERVICE'.
+  gs_item-name        = ls_icf-icf_name.
+  gs_item-protocol    = 'HTTP'.
+  gs_item-usage_count = -1.
+  APPEND gs_item TO gt_items.
+ENDLOOP.
+
+* TODO per release:
+*   - OData   : /IWFND/V4_MED_SRV_RUNTIME, table /IWFND/I_MED_SRG / IWSG
+*   - Web svc : SRT_* / table WSPDOABININD, SOAMANAGER bindings
+*   - PI/PO   : SLD / Integration Directory export (no single table)
+*   - BTP     : Integration Suite — usually a manual / API-based inventory
+*   - Usage   : SCMON/SUSG (UPL) — populate usage_count to drive RETIRE
+
+*&---------------------------------------------------------------------*
+*& 4) Emit JSON matching extract_schema.json
+*&---------------------------------------------------------------------*
+DATA: lv_json TYPE string,
+      lv_row  TYPE string.
+
+lv_json = '{ "extractVersion": "1.0", "items": ['.
+DATA(lv_first) = abap_true.
+LOOP AT gt_items INTO gs_item.
+  IF lv_first = abap_false.
+    CONCATENATE lv_json ',' INTO lv_json.
+  ENDIF.
+  lv_first = abap_false.
+
+  " Minimal JSON escaping for quotes/backslashes is recommended for
+  " production; names here are technical and rarely contain quotes.
+  CONCATENATE
+    '{ "category":"' gs_item-category
+    '","name":"'     gs_item-name
+    '","target":"'   gs_item-target
+    '","protocol":"' gs_item-protocol
+    '","direction":"' gs_item-direction
+    '","usageCount":' CONV string( gs_item-usage_count )
+    ',"migrationNote":"' gs_item-migration '" }'
+    INTO lv_row.
+  CONCATENATE lv_json lv_row INTO lv_json.
+ENDLOOP.
+CONCATENATE lv_json '] }' INTO lv_json.
+
+" Download to the presentation server (SAP GUI). For background runs,
+" write to the application server with OPEN DATASET instead.
+DATA: lt_lines TYPE STANDARD TABLE OF string.
+APPEND lv_json TO lt_lines.
+CALL FUNCTION 'GUI_DOWNLOAD'
+  EXPORTING
+    filename = p_file
+    filetype = 'ASC'
+  TABLES
+    data_tab = lt_lines
+  EXCEPTIONS
+    OTHERS   = 0.
+
+WRITE: / 'Wrote', lines( gt_items ), 'inventory item(s) to', p_file.

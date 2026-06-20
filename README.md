@@ -52,6 +52,15 @@ S/4HANA and ABAP Cloud"* metodolojisiyle hizalıdır.
 - **Profil bazlı efor**: aynı obje seti farklı senaryolarda farklı man-day
   verir (ör. R/3→RISE en yüksek çarpan). `EffortRules` profilleri
   `object_rules.json` `profiles` bloğunda.
+- **Entegrasyon envanteri**: SM59 RFC, WE20 IDoc, SICF/OData, web servisleri,
+  PI/PO ve BTP gibi entegrasyonlar ADT REST'te görünmez (Basis config). Bu yüzden
+  kaynak sistemde çalıştırılan `resources/extract/Z_TRANSFORM_INVENTORY.abap.txt`
+  raporu tek bir JSON üretir (şema: `resources/extract/extract_schema.json`).
+  Run Analysis wizard'ında *"Integration extract"* alanından bu JSON seçilir;
+  senaryonun aktif ettiği kategoriler kapsama alınır, her kalem için S/M/L/XL +
+  man-day tahmini (kullanım=0 → retire ≈ 0) hesaplanır ve proje raporundaki
+  *integration* kategorisine + dalga planına eklenir. Dosya yoksa/bozuksa
+  graceful biçimde atlanır (run asla durmaz).
 - **Project Report** (*Export Project Report* butonu): presales-dostu,
   bağımlılıksız **HTML** rapor + özet **CSV**. İçerik: toplam man-day (+
   contingency), kategori kırılımı (custom code / modifications / DDIC /
@@ -147,6 +156,9 @@ com.sap.cleancore/
 │   │   └── atc_variants.json
 │   ├── scenario/
 │   │   └── scenarios.json      (transformation scenarios)
+│   ├── extract/
+│   │   ├── Z_TRANSFORM_INVENTORY.abap.txt  (ABAP inventory extractor)
+│   │   └── extract_schema.json (extract ↔ ingestor contract)
 │   ├── data/
 │   └── icons/
 └── src/com/sap/cleancore/
@@ -156,6 +168,7 @@ com.sap.cleancore/
         ├── analyzers/    StaticAbapAnalyzer, ObsoleteApiDetector, ...
         ├── collectors/   ZObjectCollector, AnalysisService,
         │                 WorkspaceAdtCollector, AdtResourceSourceFetcher, ...
+        │     └── inventory/  IntegrationInventoryService, ExtractIngestor
         ├── data/         AdtConnectionService, CapabilityDetector,
         │                 ReleaseObject, SapReleaseDataService
         ├── effort/       EffortEstimator, EffortRules (profile-aware)
