@@ -1,6 +1,7 @@
 package com.sap.cleancore.analyzer.collectors;
 
 import com.sap.cleancore.analyzer.analyzers.ComplexityCalculator;
+import com.sap.cleancore.analyzer.analyzers.DispositionClassifier;
 import com.sap.cleancore.analyzer.analyzers.ModificationDetector;
 import com.sap.cleancore.analyzer.analyzers.ObsoleteApiDetector;
 import com.sap.cleancore.analyzer.analyzers.StaticAbapAnalyzer;
@@ -53,6 +54,7 @@ public class AnalysisService {
     private final ModificationDetector modDetector = new ModificationDetector();
     private final ComplexityCalculator complexityCalc = new ComplexityCalculator();
     private final EffortEstimator estimator = new EffortEstimator();
+    private final DispositionClassifier dispositionClassifier = new DispositionClassifier();
 
     /**
      * Backwards-compatible entry point — uses the default transformation
@@ -333,6 +335,10 @@ public class AnalysisService {
 
         // 4f) Effort
         estimator.estimate(item);
+
+        // 4g) Disposition (SAP decision tree). No-op for the legacy default
+        //     scenario; may force RETIRE (MD≈0) when usage data shows it's unused.
+        dispositionClassifier.classify(item, run.getScenario());
 
         run.addItem(item);
     }

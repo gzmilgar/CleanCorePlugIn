@@ -22,7 +22,7 @@ public class ExportUtil {
     public static void exportCsv(AnalysisRun run, File target) throws Exception {
         try (BufferedWriter w = new BufferedWriter(new OutputStreamWriter(
                 new FileOutputStream(target), StandardCharsets.UTF_8))) {
-            w.write("Package;ZObject;Type;LOC;Complexity;Findings;ModernEquivalent;Category;EstimatedMD;Risk");
+            w.write("Package;ZObject;Type;LOC;Complexity;Findings;ModernEquivalent;Category;EstimatedMD;Risk;Disposition;UsageCount");
             w.newLine();
             for (MigrationItem it : run.getItems()) {
                 String pkg = safe(it.getzObject().getDevClass());
@@ -41,7 +41,9 @@ public class ExportUtil {
                         safe(mod),
                         it.getEffortCategory() != null ? it.getEffortCategory().name() : "",
                         String.valueOf(it.getEstimatedMD()),
-                        safe(it.getRisk())));
+                        safe(it.getRisk()),
+                        it.getDisposition() != null ? it.getDisposition().name() : "",
+                        it.getUsageCount() >= 0 ? String.valueOf(it.getUsageCount()) : ""));
                 w.newLine();
             }
         }
@@ -50,6 +52,16 @@ public class ExportUtil {
     public static void exportJson(AnalysisRun run, File target) throws Exception {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("system", run.getSystemDisplay());
+        if (run.getScenario() != null) {
+            Map<String, Object> sc = new LinkedHashMap<>();
+            sc.put("id", run.getScenario().getId());
+            sc.put("displayName", run.getScenario().getDisplayName());
+            sc.put("sourceRelease", run.getScenario().getSourceRelease() != null
+                    ? run.getScenario().getSourceRelease().name() : null);
+            sc.put("targetPlatform", run.getScenario().getTargetPlatform() != null
+                    ? run.getScenario().getTargetPlatform().name() : null);
+            root.put("scenario", sc);
+        }
         root.put("startedAt", run.getStartedAt());
         root.put("finishedAt", run.getFinishedAt());
         root.put("totalMD", run.getTotalMD());
@@ -70,6 +82,8 @@ public class ExportUtil {
             row.put("category", it.getEffortCategory() != null ? it.getEffortCategory().name() : null);
             row.put("estimatedMD", it.getEstimatedMD());
             row.put("risk", it.getRisk());
+            row.put("disposition", it.getDisposition() != null ? it.getDisposition().name() : null);
+            if (it.getUsageCount() >= 0) row.put("usageCount", it.getUsageCount());
             row.put("reasoning", it.getReasoning());
             java.util.List<Object> maps = new java.util.ArrayList<>();
             for (MappingEntry m : it.getRecommendedMappings()) {
