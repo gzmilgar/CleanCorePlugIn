@@ -15,6 +15,7 @@ public class ZObject {
     private int loc;                // lines of code
     private int complexity;         // cyclomatic-ish
     private boolean modification;   // is a SAP standard modification (REPS in SAP package)
+    private long usageCount = -1;   // ABAP Call Monitor (SCMON/SUSG) usage; -1 = unknown, 0 = unused
 
     public ZObject() {}
 
@@ -53,6 +54,9 @@ public class ZObject {
 
     public boolean isModification() { return modification; }
     public void setModification(boolean modification) { this.modification = modification; }
+
+    public long getUsageCount() { return usageCount; }
+    public void setUsageCount(long usageCount) { this.usageCount = usageCount; }
 
     private static int countLoc(String s) {
         int lines = 0;

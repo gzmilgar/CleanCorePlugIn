@@ -348,8 +348,10 @@ public class AnalysisService {
         // 4f) Effort
         estimator.estimate(item);
 
-        // 4g) Disposition (SAP decision tree). No-op for the legacy default
-        //     scenario; may force RETIRE (MD≈0) when usage data shows it's unused.
+        // 4g) Disposition (SAP decision tree). Carry usage data (e.g. from an
+        //     offline metadata.json) so unused custom code becomes RETIRE.
+        //     No-op for the legacy default scenario.
+        item.setUsageCount(z.getUsageCount());
         dispositionClassifier.classify(item, run.getScenario());
 
         run.addItem(item);

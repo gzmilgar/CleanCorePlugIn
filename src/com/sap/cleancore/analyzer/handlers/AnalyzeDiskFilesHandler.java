@@ -6,8 +6,8 @@ import com.sap.cleancore.analyzer.model.AnalysisRun;
 import com.sap.cleancore.analyzer.model.Finding;
 import com.sap.cleancore.analyzer.model.MigrationItem;
 import com.sap.cleancore.analyzer.model.ZObject;
-import com.sap.cleancore.analyzer.model.ZObjectType;
 import com.sap.cleancore.analyzer.ui.CleanCoreAnalyzerView;
+import com.sap.cleancore.analyzer.utils.OfflineSourceReader;
 
 import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
@@ -27,13 +27,8 @@ import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.handlers.HandlerUtil;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Handler for "Clean Core - Analyze ABAP Files from Disk...".
@@ -109,40 +104,17 @@ public class AnalyzeDiskFilesHandler extends AbstractHandler {
                             IProgressMonitor monitor) {
         monitor.beginTask("Reading files", Math.max(1, files.size()));
 
-        // 1) Read each file and build a ZObject with pre-loaded source.
-        List<ZObject> zObjects = new ArrayList<>(files.size());
-        int skipped = 0;
+        // 1) Read each file and build a ZObject with pre-loaded source
+        //    (shared offline reader; same extension→type mapping as before).
+        OfflineSourceReader.ScanResult scan = new OfflineSourceReader().readFiles(files);
+        List<ZObject> zObjects = scan.objects;
+        int skipped = scan.skipped;
         StringBuilder skippedNames = new StringBuilder();
-        for (File f : files) {
-            checkCancel(monitor);
-            monitor.subTask("Reading " + f.getName());
-            String content;
-            try {
-                Path p = Paths.get(f.getAbsolutePath());
-                content = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
-            } catch (Throwable t) {
-                skipped++;
-                if (skippedNames.length() < 200) {
-                    if (skippedNames.length() > 0) skippedNames.append(", ");
-                    skippedNames.append(f.getName());
-                }
-                monitor.worked(1);
-                continue;
-            }
-            if (content == null || content.isEmpty()) {
-                skipped++;
-                monitor.worked(1);
-                continue;
-            }
-
-            ZObject z = new ZObject();
-            z.setName(stemOf(f.getName()).toUpperCase(Locale.ROOT));
-            z.setType(typeFor(f.getName()));
-            z.setDevClass("DISK");
-            z.setSource(content);
-            zObjects.add(z);
-            monitor.worked(1);
+        for (String n : scan.skippedNames) {
+            if (skippedNames.length() > 0) skippedNames.append(", ");
+            skippedNames.append(n);
         }
+        monitor.worked(files.size());
 
         if (zObjects.isEmpty()) {
             asyncInfo(window, "Clean Core - Analyze ABAP Files from Disk",
@@ -210,40 +182,4 @@ public class AnalyzeDiskFilesHandler extends AbstractHandler {
                 MessageDialog.openInformation(window != null ? window.getShell() : null, title, msg));
     }
 
-    private void checkCancel(IProgressMonitor monitor) {
-        if (monitor != null && monitor.isCanceled()) {
-            throw new OperationCanceledException();
-        }
-    }
-
-    private static String stemOf(String name) {
-        if (name == null) return "";
-        int dot = name.lastIndexOf('.');
-        return dot > 0 ? name.substring(0, dot) : name;
-    }
-
-    private static ZObjectType typeFor(String fileName) {
-        if (fileName == null) return ZObjectType.UNKNOWN;
-        int dot = fileName.lastIndexOf('.');
-        String ext = dot > 0 ? fileName.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
-        switch (ext) {
-            case "aclass":
-            case "clas":     return ZObjectType.Z_CLASS;
-            case "asinc":
-            case "reps":     return ZObjectType.Z_INCLUDE;
-            case "prog":
-            case "asprog":
-            case "abap":     return ZObjectType.Z_REPORT;
-            case "fugr":
-            case "asfunc":   return ZObjectType.Z_FUNCTION_MODULE;
-            case "intf":
-            case "asintf":   return ZObjectType.Z_INTERFACE;
-            case "tabl":
-            case "asddic":   return ZObjectType.Z_DDIC_TABLE;
-            case "ddls":
-            case "asddls":   return ZObjectType.Z_CDS_VIEW;
-            case "enho":     return ZObjectType.Z_ENHANCEMENT;
-            default:         return ZObjectType.UNKNOWN;
-        }
-    }
 }

@@ -18,6 +18,7 @@ public class ModificationDetector {
         String pkg = z.getDevClass() != null ? z.getDevClass().toUpperCase(Locale.ROOT) : "";
         String name = z.getName() != null ? z.getName().toUpperCase(Locale.ROOT) : "";
         boolean inSapPackage = !pkg.isEmpty()
+                && !pkg.equals("DISK")    // offline sentinel: real package unknown
                 && !pkg.startsWith("Z")
                 && !pkg.startsWith("Y")
                 && !pkg.startsWith("$"); // local

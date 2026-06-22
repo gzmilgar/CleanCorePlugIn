@@ -71,6 +71,12 @@
             description="Pick local ABAP source files via a file dialog and analyse them - no SAP connection required (R/3 offline workflow)."
             categoryId="com.sap.cleancore.analyzer.commands">
       </command>
+      <command
+            id="com.sap.cleancore.analyzer.analyzeFolder"
+            name="Analyze Folder (Offline)"
+            description="Recursively analyse a folder of dumped ABAP source files (with optional metadata.json) - no SAP/ADT connection required. The offline counterpart of Analyze Selected Package for old systems."
+            categoryId="com.sap.cleancore.analyzer.commands">
+      </command>
    </extension>
    <extension point="org.eclipse.ui.handlers">
       <handler
@@ -88,6 +94,10 @@
       <handler
             commandId="com.sap.cleancore.analyzer.analyzeDiskFiles"
             class="com.sap.cleancore.analyzer.handlers.AnalyzeDiskFilesHandler">
+      </handler>
+      <handler
+            commandId="com.sap.cleancore.analyzer.analyzeFolder"
+            class="com.sap.cleancore.analyzer.handlers.AnalyzeFolderHandler">
       </handler>
    </extension>
    <extension point="org.eclipse.ui.bindings">
@@ -118,6 +128,11 @@
                   label="Analyze ABAP Files from Disk..."
                   style="push">
             </command>
+            <command
+                  commandId="com.sap.cleancore.analyzer.analyzeFolder"
+                  label="Analyze Folder (Offline)..."
+                  style="push">
+            </command>
          </menu>
       </menuContribution>
       <menuContribution
@@ -128,6 +143,11 @@
             <command
                   commandId="com.sap.cleancore.analyzer.analyzeSelectedPackage"
                   label="Analyze Selected Package"
+                  style="push">
+            </command>
+            <command
+                  commandId="com.sap.cleancore.analyzer.analyzeFolder"
+                  label="Analyze Folder (Offline)"
                   style="push">
             </command>
          </menu>

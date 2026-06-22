@@ -70,6 +70,39 @@ S/4HANA and ABAP Cloud"* metodolojisiyle hizalıdır.
 - **Geriye uyumluluk**: "Generic Clean Core readiness" (default) senaryosu
   bugünkü davranışı birebir korur (disposition UNDECIDED, MD değişmez).
 
+## ADT olmayan / eski sürüm offline iş akışı (YENİ)
+
+ADT'nin hiç çalışmadığı eski sistemlerde (R/3 4.6C/4.7, eski ECC, her sürüm)
+plug-in tam **offline** çalışır — Eclipse'in canlı sisteme hiçbir bağlantısı
+gerekmez. Plug-in zaten `com.sap.adt.*` bundle'larına **zorunlu bağlı değildir**,
+yani ADT kurulu olmayan düz Eclipse'te de yüklenir.
+
+**Akış (soldan tıkla → analiz):**
+1. Kaynak sistemde özel kodu bir klasöre **dosya olarak** dök: SE38/SE80
+   download, abapGit pull, transport/SAPlink — `*.abap, *.prog, *.clas, *.fugr,
+   *.intf, *.txt` vb.
+2. Eclipse'te klasörü içeri al: **File → Open Projects from File System...** (veya
+   New → Project → General → Project, sonra klasörü linkle).
+3. Project Explorer'da soldan klasörü gez — dosyaları çift tıkla aç/incele/kapat
+   (native, ADT gerekmez).
+4. Klasöre (veya projeye) **sağ tık → Clean Core → Analyze Folder (Offline)**.
+   (Alternatif: menü **Clean Core → Analyze Folder (Offline)...** → klasör seç.)
+5. Açılan diyalogda **Transformation Scenario** ve opsiyonel entegrasyon
+   extract'ini seç → analiz arka planda çalışır.
+6. Sonuçlar Clean Core Analyzer view'ında; **Export Project Report** ile HTML/CSV
+   proje raporu al.
+
+**Opsiyonel `metadata.json` (önerilen):** Dump klasörünün köküne `metadata.json`
+koyarsan plug-in her objeyi zenginleştirir — gerçek TADIR tipi, **paket (devClass
+→ modifikasyon tespiti)**, yazar, oluşturma tarihi ve **kullanım sayısı (SCMON →
+usage=0 ise RETIRE)**. Dosya yoksa analiz yine çalışır (dosya adı + source ile).
+Şema ve örnek: `resources/extract/code_metadata_schema.json`. Eşleşme obje adına
+göredir; `metadata.json` herhangi bir araç/rapor ile üretilebilir.
+
+> Not: ADT yoksa "soldan tıkla aç" yalnızca **diske dökülmüş dosyalar** üzerinde
+> çalışır — plug-in canlı sisteme bağlanamaz. Dosyalar düz metin editörüyle
+> açılır (ADT ABAP syntax highlight olmaz, içerik okunur).
+
 ## Kurulum (geliştirme için)
 
 ### Gereksinimler
@@ -158,7 +191,8 @@ com.sap.cleancore/
 │   │   └── scenarios.json      (transformation scenarios)
 │   ├── extract/
 │   │   ├── Z_TRANSFORM_INVENTORY.abap.txt  (ABAP inventory extractor)
-│   │   └── extract_schema.json (extract ↔ ingestor contract)
+│   │   ├── extract_schema.json (integration extract contract)
+│   │   └── code_metadata_schema.json (offline metadata.json contract)
 │   ├── data/
 │   └── icons/
 └── src/com/sap/cleancore/
@@ -168,7 +202,8 @@ com.sap.cleancore/
         ├── analyzers/    StaticAbapAnalyzer, ObsoleteApiDetector, ...
         ├── collectors/   ZObjectCollector, AnalysisService,
         │                 WorkspaceAdtCollector, AdtResourceSourceFetcher, ...
-        │     └── inventory/  IntegrationInventoryService, ExtractIngestor
+        │     ├── inventory/  IntegrationInventoryService, ExtractIngestor
+        │     └── offline/    CodeMetadataIngestor (metadata.json)
         ├── data/         AdtConnectionService, CapabilityDetector,
         │                 ReleaseObject, SapReleaseDataService
         ├── effort/       EffortEstimator, EffortRules (profile-aware)
@@ -177,7 +212,8 @@ com.sap.cleancore/
         │                 ProjectReportExporter
         ├── handlers/     AnalyzeCurrentFileHandler,
         │                 AnalyzeAllOpenEditorsHandler,
-        │                 AnalyzeSelectedPackageHandler
+        │                 AnalyzeSelectedPackageHandler,
+        │                 AnalyzeDiskFilesHandler, AnalyzeFolderHandler
         ├── mapping/      MappingRepository, SapApiHubClient,
         │                 SapCloudificationBridge
         ├── model/        ZObject, AnalysisRun, MigrationItem,
@@ -185,9 +221,10 @@ com.sap.cleancore/
         │                 TransformationScenario, Disposition, ...
         ├── preferences/  CleanCorePreferencePage
         ├── ui/           CleanCoreAnalyzerView, MappingMaintenanceView,
-        │                 ConnectionDialog, AnalysisWizardDialog
+        │                 ConnectionDialog, AnalysisWizardDialog,
+        │                 OfflineAnalysisDialog
         └── utils/        SimpleJsonParser, JsonWriter, ExportUtil,
-                          ResourceLoader
+                          ResourceLoader, OfflineSourceReader
 ```
 
 ## Lisans

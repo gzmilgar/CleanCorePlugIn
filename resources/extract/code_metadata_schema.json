@@ -1,0 +1,33 @@
+{
+  "_comment": "OPTIONAL metadata sidecar for the offline (no-ADT) folder workflow. Place this file named exactly 'metadata.json' in the SAME folder as your dumped ABAP source files. CodeMetadataIngestor matches entries to source objects by 'name' (case-insensitive) and enriches them with data ADT would normally provide. Everything is optional: a missing file (or missing field) just leaves file-derived defaults. tadirType uses 4-letter TADIR codes (PROG, CLAS, FUGR, INTF, TABL, DDLS, ENHO, ENHS, ...); devClass enables modification detection (SAP package => modification); usageCount=0 marks an unused object => RETIRE (≈0 MD). Produce this with any tool/report (e.g. a SE38 TADIR/SCMON dump).",
+  "system": "PRD_100",
+  "objects": [
+    {
+      "name": "ZFI_INVOICE",
+      "tadirType": "PROG",
+      "devClass": "ZFI",
+      "author": "DEVELOPER1",
+      "createdOn": "2018-05-14",
+      "usageCount": 1820,
+      "sourceFile": "ZFI_INVOICE.abap"
+    },
+    {
+      "name": "ZCL_LEGACY_HELPER",
+      "tadirType": "CLAS",
+      "devClass": "ZUTIL",
+      "author": "DEVELOPER2",
+      "createdOn": "2015-02-01",
+      "usageCount": 0,
+      "sourceFile": "ZCL_LEGACY_HELPER.clas"
+    },
+    {
+      "name": "SAPMV45A",
+      "tadirType": "PROG",
+      "devClass": "VA",
+      "author": "DEVELOPER3",
+      "createdOn": "2012-11-09",
+      "usageCount": 30,
+      "sourceFile": "SAPMV45A.prog"
+    }
+  ]
+}
