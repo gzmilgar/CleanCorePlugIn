@@ -15,7 +15,7 @@ import java.util.List;
  * {@code /sap/bc/adt/repository/informationsystem/search} — which is the only
  * service catalogue ADT exposes cleanly across releases.
  *
- * <p>Discovers custom (Z*/Y*) OData service definitions (SRVD) and service
+ * <p>Discovers custom (Z* / Y*) OData service definitions (SRVD) and service
  * bindings (SRVB). Everything else (SICF tree, SOAP web services, /IWFND
  * gateway registrations) lives in Basis tables that ADT does not expose, so
  * those stay with the offline extract path.
