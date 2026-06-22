@@ -4,12 +4,11 @@ import com.sap.cleancore.analyzer.data.AdtConnectionService;
 import com.sap.cleancore.analyzer.model.AnalysisFilter;
 import com.sap.cleancore.analyzer.model.ZObject;
 import com.sap.cleancore.analyzer.model.ZObjectType;
+import com.sap.cleancore.analyzer.utils.AdtObjectRefParser;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Pulls the Z* object inventory from a system via the ADT repository
@@ -22,10 +21,6 @@ import java.util.regex.Pattern;
  * (FULL / PACKAGE_PREFIX / SINGLE_OBJECT), object-type subset, max results.
  */
 public class ZObjectCollector {
-
-    private static final Pattern OBJ_REF = Pattern.compile(
-            "<adtcore:objectReference[^>]*adtcore:name=\"([^\"]+)\"[^>]*adtcore:type=\"([^\"]+)\"[^>]*?(?:adtcore:packageName=\"([^\"]*)\")?",
-            Pattern.DOTALL);
 
     /** New entry point. */
     public List<ZObject> collect(AnalysisFilter filter) throws Exception {
@@ -105,15 +100,11 @@ public class ZObjectCollector {
                 + "&objectType=" + urlEncode(objType);
         String xml = adt.get(path, "application/xml");
         List<ZObject> out = new ArrayList<>();
-        Matcher m = OBJ_REF.matcher(xml);
-        while (m.find()) {
-            String name = m.group(1);
-            String type = m.group(2);
-            String pkg = m.group(3);
+        for (AdtObjectRefParser.Ref r : AdtObjectRefParser.parse(xml)) {
             ZObject z = new ZObject();
-            z.setName(name);
-            z.setType(mapAdtType(type));
-            z.setDevClass(pkg);
+            z.setName(r.name);
+            z.setType(mapAdtType(r.type));
+            z.setDevClass(r.pkg);
             out.add(z);
         }
         return out;

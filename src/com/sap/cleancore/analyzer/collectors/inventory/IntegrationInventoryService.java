@@ -27,6 +27,7 @@ public class IntegrationInventoryService {
 
     private final ExtractIngestor ingestor = new ExtractIngestor();
     private final InventoryEffortEstimator effort = new InventoryEffortEstimator();
+    private final LiveServiceCollector liveServices = new LiveServiceCollector();
 
     /**
      * @param scenario     drives which categories are in scope (may be null → none)
@@ -37,19 +38,42 @@ public class IntegrationInventoryService {
         Set<InventoryCategory> enabled = enabledCategories(scenario);
         if (enabled.isEmpty()) return out;
 
+        // De-duplicate across sources by category + upper-case name.
+        Set<String> seen = new java.util.HashSet<>();
+
         // Primary source: extract file (best-effort, never throws).
         for (InventoryItem it : ingestor.ingestQuietly(extractFile)) {
             if (it.getCategory() != null && enabled.contains(it.getCategory())) {
+                if (!seen.add(key(it))) continue;
                 effort.estimate(it);
                 out.add(it);
             }
         }
 
-        // Secondary tier (live ADT/HTTP collectors) would be invoked here,
-        // each wrapped in try/catch and de-duplicated against `out`. Left as a
-        // future extension since those Basis tables are not exposed by ADT REST.
+        // Secondary tier: live ADT/HTTP service discovery (best-effort, never
+        // throws). Only OData service definitions/bindings are exposed by ADT
+        // REST; the other categories remain extract-only.
+        if (enabled.contains(InventoryCategory.ODATA_SERVICE)) {
+            try {
+                for (InventoryItem it : liveServices.collect()) {
+                    if (it.getCategory() != null && enabled.contains(it.getCategory())) {
+                        if (!seen.add(key(it))) continue;
+                        effort.estimate(it);
+                        out.add(it);
+                    }
+                }
+            } catch (Throwable ignored) {
+                // graceful degradation — live tier is optional
+            }
+        }
 
         return out;
+    }
+
+    /** De-dup key: category + upper-case name. */
+    private static String key(InventoryItem it) {
+        String n = it.getName() != null ? it.getName().toUpperCase() : "";
+        return it.getCategory() + "|" + n;
     }
 
     /** Maps the scenario's collector ids to inventory categories. */

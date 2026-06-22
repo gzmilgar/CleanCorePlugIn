@@ -1,13 +1,18 @@
 package com.sap.cleancore.analyzer.handlers;
 
 import com.sap.cleancore.analyzer.collectors.AnalysisService;
+import com.sap.cleancore.analyzer.collectors.ZObjectCollector;
 import com.sap.cleancore.analyzer.data.AdtConnectionService;
 import com.sap.cleancore.analyzer.mapping.MappingRepository;
+import com.sap.cleancore.analyzer.model.AnalysisFilter;
 import com.sap.cleancore.analyzer.model.AnalysisRun;
 import com.sap.cleancore.analyzer.model.Finding;
 import com.sap.cleancore.analyzer.model.MigrationItem;
+import com.sap.cleancore.analyzer.model.TransformationScenario;
 import com.sap.cleancore.analyzer.model.ZObject;
 import com.sap.cleancore.analyzer.model.ZObjectType;
+import com.sap.cleancore.analyzer.preferences.CleanCorePreferences;
+import com.sap.cleancore.analyzer.scenario.ScenarioRegistry;
 import com.sap.cleancore.analyzer.ui.CleanCoreAnalyzerView;
 
 import org.eclipse.core.commands.AbstractHandler;
@@ -20,6 +25,7 @@ import org.eclipse.core.runtime.IAdaptable;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.OperationCanceledException;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jface.dialogs.MessageDialog;
@@ -212,7 +218,23 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
 
     private IStatus analyse(Object selectedNode, TreeViewer viewer, IWorkbenchPart activePart,
                             String pkgLabel, IWorkbenchWindow window, IProgressMonitor monitor) {
-        // 1) Walk the tree under the selected package and collect candidates.
+        // 0) Auto-connect from the selected node's ADT project so we don't
+        //    require a separate "Connect..." step. This also lets us use the
+        //    reliable ADT REST enumeration below.
+        ensureConnectedFromSelection(selectedNode, activePart);
+
+        // 1) Preferred path: when connected, enumerate the package AND all of
+        //    its sub-packages over ADT REST (informationsystem/search) instead
+        //    of scraping the lazily-loaded SWT tree. This fixes the "No Z*/Y*
+        //    child objects" failure on packages whose objects live in
+        //    sub-packages (e.g. ZNT → ZNT_000 … ZNT_024 → Classes → object).
+        if (AdtConnectionService.getInstance().isConnected()) {
+            IStatus rest = analyseViaRest(pkgLabel, window, monitor);
+            if (rest != null) return rest;  // null → REST found nothing; fall back
+        }
+
+        // 2) Fallback: walk the tree under the selected package and collect
+        //    candidates (offline / older systems / REST returned nothing).
         Diagnostics diag = new Diagnostics();
         List<Candidate> candidates = collectCandidates(selectedNode, viewer, diag);
 
@@ -390,6 +412,147 @@ public class AnalyzeSelectedPackageHandler extends AbstractHandler {
 
         monitor.done();
         return Status.OK_STATUS;
+    }
+
+    // ---------- ADT REST path (preferred when connected) ----------
+
+    /**
+     * Enumerates the package and all its sub-packages via ADT REST and runs the
+     * full analysis pipeline (source fetched over HTTP, no editor open/close
+     * dance). Returns:
+     *   - Status.OK / CANCEL / ERROR when the REST path handled the request,
+     *   - {@code null} when REST is unusable (not reachable, threw, or returned
+     *     no objects) so the caller falls back to SWT-tree scraping.
+     */
+    private IStatus analyseViaRest(String pkgLabel, IWorkbenchWindow window, IProgressMonitor monitor) {
+        if (pkgLabel == null || pkgLabel.trim().isEmpty()) return null;
+        List<ZObject> objects;
+        try {
+            monitor.subTask("Enumerating package " + pkgLabel + " via ADT REST...");
+            AnalysisFilter f = new AnalysisFilter();
+            f.setMode(AnalysisFilter.Mode.PACKAGE_PREFIX);
+            List<String> prefixes = new ArrayList<>();
+            // Trailing '*' → ZObjectCollector.matchesPackage does a startsWith,
+            // so this captures the package itself AND every sub-package
+            // (ZNT, ZNT_000, ZNT_001, … ZNT_024).
+            prefixes.add(pkgLabel.trim() + "*");
+            f.setPackagePrefixes(prefixes);
+            objects = new ZObjectCollector().collect(f);
+        } catch (Throwable t) {
+            // Not connected for real / endpoint missing / parse error — fall back.
+            return null;
+        }
+        if (objects == null || objects.isEmpty()) return null;
+
+        AnalysisRun run;
+        try {
+            // runOnObjects fetches source over HTTP (httpReachable derived from
+            // the connected ADT project) and also collects the integration
+            // inventory (services) for the active scenario.
+            run = new AnalysisService().runOnObjects(
+                    objects, "Package: " + pkgLabel, resolveScenario(), monitor);
+        } catch (OperationCanceledException oce) {
+            return Status.CANCEL_STATUS;
+        } catch (Throwable t) {
+            return new Status(IStatus.ERROR, "com.sap.cleancore",
+                    "Analyze Selected Package (ADT REST) failed: " + t.getMessage(), t);
+        }
+
+        int analysed = 0;
+        List<Finding> combined = new ArrayList<>();
+        for (MigrationItem it : run.getItems()) {
+            if (it.getzObject() != null && it.getzObject().getLoc() > 0) analysed++;
+            if (it.getFindings() != null) combined.addAll(it.getFindings());
+        }
+
+        final AnalysisRun runRef = run;
+        final List<Finding> findingsRef = combined;
+        final int analysedRef = analysed;
+        final int totalRef = objects.size();
+        Display.getDefault().asyncExec(() -> {
+            try {
+                IWorkbenchPage page = window != null ? window.getActivePage() : null;
+                if (page == null) return;
+                CleanCoreAnalyzerView view =
+                        (CleanCoreAnalyzerView) page.showView(CleanCoreAnalyzerView.ID);
+                view.showAnalysisRun(runRef);
+                view.showCurrentFileFindings(
+                        "Package " + pkgLabel + " - " + analysedRef + "/" + totalRef
+                              + " object(s) analysed via ADT REST", findingsRef);
+            } catch (Throwable t) {
+                MessageDialog.openError(window != null ? window.getShell() : null,
+                        "Clean Core - Analyze Selected Package",
+                        "Analysed " + analysedRef + " object(s) but the results view "
+                              + "could not be opened:\n" + t.getMessage());
+            }
+        });
+        monitor.done();
+        return Status.OK_STATUS;
+    }
+
+    /** Resolves the user's preferred transformation scenario (default fallback). */
+    private TransformationScenario resolveScenario() {
+        try {
+            String id = CleanCorePreferences.getScenarioId();
+            if (id != null && !id.isEmpty()) {
+                TransformationScenario s = ScenarioRegistry.getInstance().byId(id);
+                if (s != null) return s;
+            }
+        } catch (Throwable ignored) {}
+        return ScenarioRegistry.getInstance().getDefault();
+    }
+
+    /**
+     * If not already connected, derives the ADT project that owns the selected
+     * node and binds the connection to it silently (no dialog). Best-effort:
+     * failure simply leaves us disconnected and the caller falls back to the
+     * offline SWT-tree path.
+     */
+    private void ensureConnectedFromSelection(Object selectedNode, IWorkbenchPart activePart) {
+        if (AdtConnectionService.getInstance().isConnected()) return;
+        IProject project = deriveProject(selectedNode);
+        if (project == null && activePart != null) {
+            // Last resort: a single ADT project open in the workspace.
+            project = deriveProject(activePart);
+        }
+        if (project == null) return;
+        try {
+            AdtConnectionService.getInstance()
+                    .connectViaProject(project, project.getName(), null, null);
+        } catch (Throwable ignored) {
+            // best-effort
+        }
+    }
+
+    /** Best-effort: resolve the owning IProject from any tree node. */
+    private IProject deriveProject(Object node) {
+        if (node == null) return null;
+        if (node instanceof IProject) return (IProject) node;
+        if (node instanceof IResource) return ((IResource) node).getProject();
+        if (node instanceof IAdaptable) {
+            try {
+                Object p = ((IAdaptable) node).getAdapter(IProject.class);
+                if (p instanceof IProject) return (IProject) p;
+                Object r = ((IAdaptable) node).getAdapter(IResource.class);
+                if (r instanceof IResource) return ((IResource) r).getProject();
+            } catch (Throwable ignored) {}
+        }
+        try {
+            IProject p = Platform.getAdapterManager().getAdapter(node, IProject.class);
+            if (p != null) return p;
+            IResource r = Platform.getAdapterManager().getAdapter(node, IResource.class);
+            if (r != null) return r.getProject();
+        } catch (Throwable ignored) {}
+        // ADT virtual-folder / object nodes commonly expose getProject().
+        for (String mn : new String[] { "getProject", "getAdtProject" }) {
+            try {
+                Method m = node.getClass().getMethod(mn);
+                Object v = m.invoke(node);
+                if (v instanceof IProject) return (IProject) v;
+                if (v instanceof IResource) return ((IResource) v).getProject();
+            } catch (Throwable ignored) {}
+        }
+        return null;
     }
 
     // ---------- selection / children resolution ----------

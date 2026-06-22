@@ -7,6 +7,7 @@ import com.sap.cleancore.analyzer.model.AnalysisRun;
 import com.sap.cleancore.analyzer.model.Finding;
 import com.sap.cleancore.analyzer.model.MappingEntry;
 import com.sap.cleancore.analyzer.model.MigrationItem;
+import com.sap.cleancore.analyzer.model.inventory.InventoryItem;
 import com.sap.cleancore.analyzer.preferences.CleanCorePreferences;
 import com.sap.cleancore.analyzer.utils.ExportUtil;
 
@@ -63,6 +64,11 @@ public class CleanCoreAnalyzerView extends ViewPart {
     private TableViewer currentFileTable;
     private Label currentFileSummaryLabel;
     private TabFolder tabFolder;
+
+    // "Services / Integration" tab — system inventory (OData/Web/RFC/IDoc/SICF)
+    private TabItem inventoryTab;
+    private TableViewer inventoryTable;
+    private Label inventorySummaryLabel;
 
     private AnalysisRun currentRun;
 
@@ -225,6 +231,46 @@ public class CleanCoreAnalyzerView extends ViewPart {
             @Override public void inputChanged(Viewer v, Object o, Object n) {}
         });
         currentFileTab.setControl(cfContainer);
+
+        // Services / Integration tab — system inventory (OData / Web services /
+        // RFC / IDoc / SICF). Populated online (when a connected scenario
+        // enables collectors) or offline (Analyze Folder + integration extract).
+        inventoryTab = new TabItem(tabs, SWT.NONE);
+        inventoryTab.setText("Services / Integration");
+        Composite invContainer = new Composite(tabs, SWT.NONE);
+        invContainer.setLayout(new GridLayout(1, false));
+        inventorySummaryLabel = new Label(invContainer, SWT.NONE);
+        inventorySummaryLabel.setText(
+                "No service inventory yet. Connect and analyze a package/system, or run "
+              + "'Analyze Folder (Offline)' with an integration extract.");
+        inventorySummaryLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+        inventoryTable = new TableViewer(invContainer, SWT.FULL_SELECTION | SWT.BORDER | SWT.V_SCROLL);
+        inventoryTable.getTable().setHeaderVisible(true);
+        inventoryTable.getTable().setLinesVisible(true);
+        inventoryTable.getTable().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        addCol(inventoryTable, "Category",  130, o -> ((InventoryItem) o).getCategory() != null
+                ? ((InventoryItem) o).getCategory().name() : "");
+        addCol(inventoryTable, "Name",      220, o -> safe(((InventoryItem) o).getName()));
+        addCol(inventoryTable, "Target",    220, o -> safe(((InventoryItem) o).getTarget()));
+        addCol(inventoryTable, "Protocol",  90,  o -> safe(((InventoryItem) o).getProtocol()));
+        addCol(inventoryTable, "Direction", 100, o -> safe(((InventoryItem) o).getDirection()));
+        addCol(inventoryTable, "Usage",     80,  o -> usageText(((InventoryItem) o).getUsageCount()));
+        addCol(inventoryTable, "Effort",    70,  o -> ((InventoryItem) o).getEffortCategory() != null
+                ? ((InventoryItem) o).getEffortCategory().name() : "");
+        addCol(inventoryTable, "MD",        60,  o -> String.valueOf(((InventoryItem) o).getEstimatedMD()));
+        addCol(inventoryTable, "Note",      360, o -> safe(((InventoryItem) o).getMigrationNote()));
+        inventoryTable.setContentProvider(new IStructuredContentProvider() {
+            @Override public Object[] getElements(Object input) {
+                if (input instanceof AnalysisRun && ((AnalysisRun) input).getInventory() != null) {
+                    return ((AnalysisRun) input).getInventory().toArray();
+                }
+                return new Object[0];
+            }
+            @Override public void dispose() {}
+            @Override public void inputChanged(Viewer v, Object o, Object n) {}
+        });
+        inventoryTab.setControl(invContainer);
 
         // Status bar
         statusLabel = new Label(parent, SWT.NONE);
@@ -433,7 +479,31 @@ public class CleanCoreAnalyzerView extends ViewPart {
         if (mainTable == null || mainTable.getTable().isDisposed()) return;
         currentRun = run;
         mainTable.setInput(currentRun);
+        showInventory(run);
         updateStatus();
+    }
+
+    /** Populates the Services / Integration tab from the run's inventory. */
+    private void showInventory(AnalysisRun run) {
+        if (inventoryTable == null || inventoryTable.getTable().isDisposed()) return;
+        int count = (run != null && run.getInventory() != null) ? run.getInventory().size() : 0;
+        if (count == 0) {
+            inventorySummaryLabel.setText(
+                    "No service inventory for this run. Pick a transformation scenario that "
+                  + "enables integration collectors, connect to the system, or load an "
+                  + "integration extract via 'Analyze Folder (Offline)'.");
+        } else {
+            inventorySummaryLabel.setText(count + " service / integration item(s)  |  "
+                  + "Integration MD: " + (run != null ? run.getInventoryMD() : 0));
+        }
+        inventorySummaryLabel.getParent().layout();
+        inventoryTable.setInput(run);
+    }
+
+    private static String usageText(long usage) {
+        if (usage < 0) return "?";
+        if (usage == 0) return "0 (unused)";
+        return String.valueOf(usage);
     }
 
     /**
