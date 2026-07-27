@@ -72,7 +72,7 @@ public class CleanCoreAnalyzerView extends ViewPart {
 
         // Toolbar
         Composite toolbar = new Composite(parent, SWT.NONE);
-        toolbar.setLayout(new GridLayout(7, false));
+        toolbar.setLayout(new GridLayout(8, false));
         toolbar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 
         Button connectBtn = new Button(toolbar, SWT.PUSH);
@@ -90,6 +90,10 @@ public class CleanCoreAnalyzerView extends ViewPart {
         Button exportJson = new Button(toolbar, SWT.PUSH);
         exportJson.setText("Export JSON");
         exportJson.addListener(SWT.Selection, e -> onExport(true));
+
+        Button exportExcel = new Button(toolbar, SWT.PUSH);
+        exportExcel.setText("Export Excel");
+        exportExcel.addListener(SWT.Selection, e -> onExportExcel());
 
         Button mappingsBtn = new Button(toolbar, SWT.PUSH);
         mappingsBtn.setText("Mapping Maintenance");
@@ -358,6 +362,27 @@ public class CleanCoreAnalyzerView extends ViewPart {
             MessageDialog.openInformation(getSite().getShell(), "Clean Core", "Exported to " + path);
         } catch (Exception ex) {
             MessageDialog.openError(getSite().getShell(), "Export failed", ex.getMessage());
+        }
+    }
+
+    private void onExportExcel() {
+        if (currentRun == null) {
+            MessageDialog.openWarning(getSite().getShell(), "Clean Core", "No analysis run to export.");
+            return;
+        }
+        FileDialog fd = new FileDialog(getSite().getShell(), SWT.SAVE);
+        fd.setFileName("cleancore_analysis.xlsx");
+        fd.setFilterExtensions(new String[]{"*.xlsx"});
+        fd.setFilterNames(new String[]{"Excel Workbook (*.xlsx)"});
+        String path = fd.open();
+        if (path == null) return;
+        try {
+            ExportUtil.exportExcel(currentRun, new File(path));
+            MessageDialog.openInformation(getSite().getShell(), "Clean Core",
+                    "Excel exported to " + path
+                    + "\n\nSheets:\n1. Summary\n2. Migration Items\n3. Findings Detail\n4. Mappings\n5. Full Detail (denormalized)");
+        } catch (Exception ex) {
+            MessageDialog.openError(getSite().getShell(), "Excel export failed", ex.getMessage());
         }
     }
 
